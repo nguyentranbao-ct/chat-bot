@@ -18,7 +18,7 @@ type PurchaseIntentRepo struct {
 
 func NewPurchaseIntentRepository(db *DB) *PurchaseIntentRepo {
 	return &PurchaseIntentRepo{
-		collection: db.database.Collection("purchase_intents"),
+		collection: db.Database.Collection("purchase_intents"),
 	}
 }
 

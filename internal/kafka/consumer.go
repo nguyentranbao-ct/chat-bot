@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
+	"github.com/carousell/ct-go/pkg/logger"
+	log "github.com/carousell/ct-go/pkg/logger/log_context"
+	"github.com/carousell/ct-go/pkg/workerpool"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
+	"github.com/nguyentranbao-ct/chat-bot/internal/service"
 	"github.com/nguyentranbao-ct/chat-bot/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/segmentio/kafka-go"
@@ -24,9 +27,10 @@ type kafkaConsumer struct {
 	numWorkers       int
 	consumeTimeout   time.Duration
 	messageHandler   MessageHandler
-	whitelistService WhitelistService
+	whitelistService service.WhitelistService
 	shutdowner       fx.Shutdowner
 	done             chan struct{}
+	workerPool       workerpool.Pool
 }
 
 // NewConsumer creates a new Kafka consumer
@@ -34,7 +38,7 @@ func NewConsumer(
 	shutdowner fx.Shutdowner,
 	cfg *config.KafkaConfig,
 	handler MessageHandler,
-	whitelist WhitelistService,
+	whitelist service.WhitelistService,
 ) (Consumer, error) {
 	if !cfg.Enabled {
 		return &noopConsumer{}, nil
@@ -52,19 +56,23 @@ func NewConsumer(
 		StartOffset: kafka.LastOffset,
 	}
 
+	numWorkers := 4 // configurable if needed
+	wp := workerpool.New(numWorkers)
+
 	return &kafkaConsumer{
 		reader:           kafka.NewReader(readerConfig),
 		metrics:          metrics,
-		numWorkers:       4, // configurable if needed
+		numWorkers:       numWorkers,
 		consumeTimeout:   30 * time.Second,
 		messageHandler:   handler,
 		whitelistService: whitelist,
 		done:             make(chan struct{}),
+		workerPool:       wp,
 	}, nil
 }
 
 func (c *kafkaConsumer) Start(ctx context.Context) error {
-	log.Printf("Starting Kafka consumer v2 for topic: %s", c.reader.Config().Topic)
+	log.Infof(ctx, "Starting Kafka consumer v2 for topic: %s", c.reader.Config().Topic)
 	defer c.reader.Close()
 
 	if c.numWorkers == 1 {
@@ -73,9 +81,11 @@ func (c *kafkaConsumer) Start(ctx context.Context) error {
 	return c.startMultiWorker(ctx)
 }
 
-func (c *kafkaConsumer) Stop() error {
-	log.Println("Stopping Kafka consumer v2")
+func (c *kafkaConsumer) Stop(ctx context.Context) error {
+	log.Infof(ctx, "Stopping Kafka consumer v2")
 	close(c.done)
+	c.workerPool.Close()
+	c.workerPool.Wait()
 	return c.reader.Close()
 }
 
@@ -93,21 +103,20 @@ func (c *kafkaConsumer) startSingleWorker(ctx context.Context) error {
 			if errors.Is(err, context.Canceled) {
 				return nil
 			}
-			log.Printf("Error fetching message: %v", err)
+			log.Errorw(ctx, "Error fetching message", "error", err)
 			continue
 		}
 
 		c.processMessage(ctx, msg, groupID)
 
 		if err := c.reader.CommitMessages(ctx, msg); err != nil {
-			log.Printf("Failed to commit message: %v", err)
+			log.Errorw(ctx, "Failed to commit message", "error", err)
 		}
 	}
 	return nil
 }
 
 func (c *kafkaConsumer) startMultiWorker(ctx context.Context) error {
-	// For now, use simple goroutines instead of workerpool
 	groupID := c.reader.Config().GroupID
 
 	for ctx.Err() == nil {
@@ -122,11 +131,14 @@ func (c *kafkaConsumer) startMultiWorker(ctx context.Context) error {
 			if errors.Is(err, context.Canceled) {
 				return nil
 			}
-			log.Printf("Error reading message: %v", err)
+			log.Errorw(ctx, "Error reading message", "error", err)
 			continue
 		}
 
-		go c.processMessage(ctx, msg, groupID)
+		// Submit message processing to workerpool
+		c.workerPool.Run(func() {
+			c.processMessage(ctx, msg, groupID)
+		})
 	}
 	return nil
 }
@@ -141,11 +153,20 @@ func (c *kafkaConsumer) processMessage(ctx context.Context, msg kafka.Message, g
 	content := "success"
 	if err != nil {
 		content = err.Error()
-		log.Printf("Error processing message: %v", err)
+		log.Errorw(ctx, "Error processing message", "error", err)
 	}
 
-	log.Printf("Processed message - topic: %s, partition: %d, offset: %d, duration: %vms, lag: %vms, status: %s",
-		msg.Topic, msg.Partition, msg.Offset, duration.Milliseconds(), lagMs, content)
+	level := getLogLevel(code)
+	log.Logw(ctx, level, content,
+		"code", code,
+		"duration_ms", duration.Milliseconds(),
+		"topic", msg.Topic,
+		"partition", msg.Partition,
+		"offset", msg.Offset,
+		"lag_ms", lagMs,
+		"key", string(msg.Key),
+		"value", json.RawMessage(msg.Value),
+	)
 
 	c.metrics.
 		WithLabelValues(code.String(), msg.Topic, groupID).
@@ -164,20 +185,40 @@ func (c *kafkaConsumer) handle(msgCtx context.Context, msg kafka.Message) (durat
 		duration = time.Since(start)
 	}()
 
-	// Parse Kafka message into our expected format
-	var incomingMessage models.IncomingMessage
-	if err := json.Unmarshal(msg.Value, &incomingMessage); err != nil {
-		return 0, fmt.Errorf("failed to unmarshal message: %w", err)
+	// Parse Kafka message into the actual format
+	var kafkaMessage models.KafkaMessage
+	if err := json.Unmarshal(msg.Value, &kafkaMessage); err != nil {
+		return 0, fmt.Errorf("failed to unmarshal kafka message: %w", err)
+	}
+
+	// Only process message.sent events
+	if kafkaMessage.Pattern != "message.sent" {
+		log.Infow(msgCtx, "Ignoring non-message.sent event", "pattern", kafkaMessage.Pattern)
+		return 0, nil
+	}
+
+	// Convert to internal IncomingMessage format
+	incomingMessage := models.IncomingMessage{
+		ChannelID: kafkaMessage.Data.ChannelID,
+		CreatedAt: kafkaMessage.Data.CreatedAt,
+		SenderID:  kafkaMessage.Data.SenderID,
+		Message:   kafkaMessage.Data.Message,
+		Metadata: models.IncomingMessageMeta{
+			LLM: models.LLMMetadata{
+				ChatMode: "sales_assistant",
+			},
+		}, // Initialize with empty metadata for now
 	}
 
 	// Check if channel is whitelisted
 	if !c.whitelistService.IsChannelAllowed(incomingMessage.ChannelID) {
-		log.Printf("Ignoring message from non-whitelisted channel: %s", incomingMessage.ChannelID)
+		log.Infow(msgCtx, "Ignoring message from non-whitelisted channel", "channel_id", incomingMessage.ChannelID)
 		return 0, nil
 	}
 
-	log.Printf("Processing Kafka message from channel: %s, sender: %s",
-		incomingMessage.ChannelID, incomingMessage.SenderID)
+	log.Infow(msgCtx, "Processing Kafka message",
+		"channel_id", incomingMessage.ChannelID,
+		"sender_id", incomingMessage.SenderID)
 
 	ctx, cancel := context.WithTimeout(msgCtx, c.consumeTimeout)
 	defer cancel()
@@ -203,10 +244,31 @@ func getCode(err error) codes.Code {
 type noopConsumer struct{}
 
 func (n *noopConsumer) Start(ctx context.Context) error {
-	log.Println("Kafka consumer is disabled")
+	log.Infof(ctx, "Kafka consumer is disabled")
 	return nil
 }
 
-func (n *noopConsumer) Stop() error {
+func (n *noopConsumer) Stop(ctx context.Context) error {
 	return nil
+}
+
+func getLogLevel(code codes.Code) logger.Level {
+	switch code {
+	case codes.OK:
+		return logger.InfoLevel
+	case codes.Canceled,
+		codes.InvalidArgument,
+		codes.NotFound,
+		codes.AlreadyExists,
+		codes.PermissionDenied,
+		codes.Unauthenticated,
+		codes.ResourceExhausted,
+		codes.FailedPrecondition,
+		codes.Aborted,
+		codes.Unimplemented,
+		codes.OutOfRange:
+		return logger.WarnLevel
+	default:
+		return logger.ErrorLevel
+	}
 }

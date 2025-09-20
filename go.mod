@@ -5,6 +5,8 @@ go 1.25.0
 require (
 	github.com/caarlos0/env/v11 v11.3.1
 	github.com/carousell/chat-api v0.0.0-20250918074315-52169473979d
+	github.com/carousell/ct-go/pkg/logger v0.9.8
+	github.com/carousell/ct-go/pkg/workerpool v0.2.1
 	github.com/firebase/genkit/go v1.0.4
 	github.com/go-playground/validator/v10 v10.27.0
 	github.com/go-resty/resty/v2 v2.16.5
@@ -14,6 +16,7 @@ require (
 	github.com/segmentio/kafka-go v0.4.49
 	go.mongodb.org/mongo-driver v1.17.4
 	go.uber.org/fx v1.24.0
+	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.73.0
 )
 
@@ -24,13 +27,13 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
+	github.com/carousell/ct-go/pkg/httpclient v0.8.1 // indirect
 	github.com/carousell/ct-go/pkg/json v0.3.3 // indirect
-	github.com/carousell/ct-go/pkg/logger v0.9.8 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.10 // indirect
-	github.com/gammazero/deque v0.2.0 // indirect
+	github.com/gammazero/deque v0.2.1 // indirect
 	github.com/gammazero/workerpool v1.1.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -63,6 +66,7 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.17.0 // indirect
+	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/scylladb/go-reflectx v1.0.1 // indirect
 	github.com/scylladb/go-set v1.0.2 // indirect
 	github.com/scylladb/gocqlx/v2 v2.4.0 // indirect
@@ -86,7 +90,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.38.0 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/crypto v0.42.0 // indirect
 	golang.org/x/net v0.44.0 // indirect

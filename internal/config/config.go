@@ -18,13 +18,17 @@ type ServerConfig struct {
 }
 
 type DatabaseConfig struct {
-	URI      string `env:"URI" envDefault:"mongodb://localhost:27017"`
-	Database string `env:"DATABASE" envDefault:"chatbot"`
+	Hosts    []string `env:"HOSTS" envDefault:"localhost:27017"`
+	Username string   `env:"USERNAME" envDefault:""`
+	Password string   `env:"PASSWORD" envDefault:""`
+	Database string   `env:"DATABASE" envDefault:"chat-bot"`
+	AuthDB   string   `env:"AUTH_DB" envDefault:"admin"`
+	Direct   bool     `env:"DIRECT" envDefault:"true"`
 }
 
 type ChatAPIConfig struct {
 	BaseURL   string `env:"BASE_URL,required" envDefault:"https://chat-dev.cmco.io"`
-	ProjectID string `env:"PROJECT_UUID,required" envDefault:"16f38160-3afa-4707-b8cb-354d2cbf1590"`
+	ProjectID string `env:"PROJECT_ID,required" envDefault:"16f38160-3afa-4707-b8cb-354d2cbf1590"`
 	APIKey    string `env:"API_KEY,required"`
 	Service   string `env:"SERVICE" envDefault:"chat-bot"`
 }
@@ -44,9 +48,17 @@ type KafkaConfig struct {
 }
 
 func Load() (*Config, error) {
-	cfg := &Config{}
+	cfg := new(Config)
 	if err := env.Parse(cfg); err != nil {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+func MustLoad() *Config {
+	cfg, err := Load()
+	if err != nil {
+		panic(err)
+	}
+	return cfg
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/carousell/chat-api/handlers/types"
 	"github.com/carousell/chat-api/pkg/client"
+	"github.com/carousell/ct-go/pkg/logger/log"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 )
@@ -22,7 +23,9 @@ type chatAPIClient struct {
 	projectID string
 }
 
-func NewChatAPIClient(cfg *config.ChatAPIConfig) ChatAPIClient {
+func NewChatAPIClient(conf *config.Config) ChatAPIClient {
+	cfg := conf.ChatAPI
+	log.Info("Creating chat-api client", log.Reflect("config", cfg))
 	config := client.Config{
 		BaseURL:   cfg.BaseURL,
 		Service:   cfg.Service,

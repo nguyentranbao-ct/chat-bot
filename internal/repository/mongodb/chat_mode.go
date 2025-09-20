@@ -18,7 +18,7 @@ type ChatModeRepo struct {
 
 func NewChatModeRepository(db *DB) *ChatModeRepo {
 	return &ChatModeRepo{
-		collection: db.database.Collection("chat_modes"),
+		collection: db.Database.Collection("chat_modes"),
 	}
 }
 

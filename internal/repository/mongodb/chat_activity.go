@@ -18,7 +18,7 @@ type ChatActivityRepo struct {
 
 func NewChatActivityRepository(db *DB) *ChatActivityRepo {
 	return &ChatActivityRepo{
-		collection: db.database.Collection("chat_activities"),
+		collection: db.Database.Collection("chat_activities"),
 	}
 }
 

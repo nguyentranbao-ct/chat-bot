@@ -10,15 +10,29 @@ import (
 )
 
 type DB struct {
-	client   *mongo.Client
-	database *mongo.Database
+	Client   *mongo.Client
+	Database *mongo.Database
 }
 
-func NewConnection(ctx context.Context, uri, database string) (*DB, error) {
-	clientOptions := options.Client().ApplyURI(uri)
-	clientOptions.SetMaxPoolSize(10)
-	clientOptions.SetMaxConnIdleTime(30 * time.Second)
-	clientOptions.SetTimeout(10 * time.Second)
+func NewConnection(ctx context.Context, host, port, username, password, database string) (*DB, error) {
+	hostAddr := fmt.Sprintf("%s:%s", host, port)
+
+	clientOptions := options.Client().
+		SetAppName("chat-bot").
+		SetHosts([]string{hostAddr}).
+		SetMaxPoolSize(10).
+		SetMaxConnIdleTime(30 * time.Second).
+		SetTimeout(10 * time.Second).
+		SetDirect(true)
+
+	// Only set auth if password is provided
+	if password != "" {
+		clientOptions.SetAuth(options.Credential{
+			AuthSource: "admin",
+			Username:   username,
+			Password:   password,
+		})
+	}
 
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
@@ -32,19 +46,19 @@ func NewConnection(ctx context.Context, uri, database string) (*DB, error) {
 	db := client.Database(database)
 
 	return &DB{
-		client:   client,
-		database: db,
+		Client:   client,
+		Database: db,
 	}, nil
 }
 
 func (db *DB) Close(ctx context.Context) error {
-	return db.client.Disconnect(ctx)
+	return db.Client.Disconnect(ctx)
 }
 
-func (db *DB) Database() *mongo.Database {
-	return db.database
+func (db *DB) GetDatabase() *mongo.Database {
+	return db.Database
 }
 
-func (db *DB) Client() *mongo.Client {
-	return db.client
+func (db *DB) GetClient() *mongo.Client {
+	return db.Client
 }
