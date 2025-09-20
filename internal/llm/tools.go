@@ -12,6 +12,14 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// SessionContext contains all the context information needed for tool execution
+type SessionContext struct {
+	SessionID primitive.ObjectID
+	ChannelID string
+	UserID    string
+	SenderID  string
+}
+
 type ToolsManager struct {
 	chatAPIClient      client.ChatAPIClient
 	sessionRepo        repository.ChatSessionRepository
@@ -34,9 +42,10 @@ func NewToolsManager(
 }
 
 type TriggerBuyArgs struct {
-	ItemName  string  `json:"item_name"`
-	ItemPrice float64 `json:"item_price"`
-	Intent    string  `json:"intent"`
+	ItemName  string `json:"item_name"`
+	ItemPrice string `json:"item_price"`
+	Intent    string `json:"intent"`
+	Message   string `json:"message,omitempty"` // Optional message to send to channel
 }
 
 type ReplyMessageArgs struct {
@@ -49,11 +58,11 @@ type FetchMessagesArgs struct {
 
 type EndSessionArgs struct{}
 
-func (tm *ToolsManager) triggerBuy(ctx context.Context, args TriggerBuyArgs, sessionID primitive.ObjectID, channelID, userID string) error {
+func (tm *ToolsManager) triggerBuy(ctx context.Context, args TriggerBuyArgs, session *SessionContext) error {
 	intent := &models.PurchaseIntent{
-		SessionID: sessionID,
-		ChannelID: channelID,
-		UserID:    userID,
+		SessionID: session.SessionID,
+		ChannelID: session.ChannelID,
+		UserID:    session.UserID,
 		ItemName:  args.ItemName,
 		ItemPrice: args.ItemPrice,
 		Intent:    args.Intent,
@@ -63,9 +72,25 @@ func (tm *ToolsManager) triggerBuy(ctx context.Context, args TriggerBuyArgs, ses
 		return fmt.Errorf("failed to create purchase intent: %w", err)
 	}
 
+	// Send message to channel if provided
+	if args.Message != "" {
+		message := &models.OutgoingMessage{
+			ChannelID: session.ChannelID,
+			SenderID:  session.SenderID,
+			Message:   args.Message,
+		}
+
+		if err := tm.chatAPIClient.SendMessage(ctx, message); err != nil {
+			log.Printf("Failed to send message after TriggerBuy: %v", err)
+			// Don't return error, just log it - we still want to log the activity
+		} else {
+			log.Printf("Message sent to channel %s after TriggerBuy", session.ChannelID)
+		}
+	}
+
 	activity := &models.ChatActivity{
-		SessionID: sessionID,
-		ChannelID: channelID,
+		SessionID: session.SessionID,
+		ChannelID: session.ChannelID,
 		Action:    models.ActivityTriggerBuy,
 		Data:      args,
 	}
@@ -74,14 +99,14 @@ func (tm *ToolsManager) triggerBuy(ctx context.Context, args TriggerBuyArgs, ses
 		log.Printf("Failed to log TriggerBuy activity: %v", err)
 	}
 
-	log.Printf("Purchase intent logged: %s wants to buy %s for $%.2f", userID, args.ItemName, args.ItemPrice)
+	log.Printf("Purchase intent logged: %s wants to buy %s for %s", session.UserID, args.ItemName, args.ItemPrice)
 	return nil
 }
 
-func (tm *ToolsManager) replyMessage(ctx context.Context, args ReplyMessageArgs, sessionID primitive.ObjectID, channelID, senderID string) error {
+func (tm *ToolsManager) replyMessage(ctx context.Context, args ReplyMessageArgs, session *SessionContext) error {
 	message := &models.OutgoingMessage{
-		ChannelID: channelID,
-		SenderID:  senderID,
+		ChannelID: session.ChannelID,
+		SenderID:  session.SenderID,
 		Message:   args.Message,
 	}
 
@@ -90,8 +115,8 @@ func (tm *ToolsManager) replyMessage(ctx context.Context, args ReplyMessageArgs,
 	}
 
 	activity := &models.ChatActivity{
-		SessionID: sessionID,
-		ChannelID: channelID,
+		SessionID: session.SessionID,
+		ChannelID: session.ChannelID,
 		Action:    models.ActivityReplyMessage,
 		Data:      args,
 	}
@@ -100,23 +125,23 @@ func (tm *ToolsManager) replyMessage(ctx context.Context, args ReplyMessageArgs,
 		log.Printf("Failed to log ReplyMessage activity: %v", err)
 	}
 
-	log.Printf("Message sent to channel %s", channelID)
+	log.Printf("Message sent to channel %s", session.ChannelID)
 	return nil
 }
 
-func (tm *ToolsManager) fetchMessages(ctx context.Context, args FetchMessagesArgs, sessionID primitive.ObjectID, channelID, userID string) (*models.MessageHistory, error) {
+func (tm *ToolsManager) fetchMessages(ctx context.Context, args FetchMessagesArgs, session *SessionContext) (*models.MessageHistory, error) {
 	if args.Limit == 0 {
 		args.Limit = 100
 	}
 
-	history, err := tm.chatAPIClient.GetMessageHistory(ctx, userID, channelID, args.Limit)
+	history, err := tm.chatAPIClient.GetMessageHistory(ctx, session.UserID, session.ChannelID, args.Limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch messages: %w", err)
 	}
 
 	activity := &models.ChatActivity{
-		SessionID: sessionID,
-		ChannelID: channelID,
+		SessionID: session.SessionID,
+		ChannelID: session.ChannelID,
 		Action:    models.ActivityFetchMessages,
 		Data:      args,
 	}
@@ -125,18 +150,18 @@ func (tm *ToolsManager) fetchMessages(ctx context.Context, args FetchMessagesArg
 		log.Printf("Failed to log FetchMessages activity: %v", err)
 	}
 
-	log.Printf("Fetched %d messages from channel %s", len(history.Messages), channelID)
+	log.Printf("Fetched %d messages from channel %s", len(history.Messages), session.ChannelID)
 	return history, nil
 }
 
-func (tm *ToolsManager) endSession(ctx context.Context, args EndSessionArgs, sessionID primitive.ObjectID, channelID string) error {
-	if err := tm.sessionRepo.EndSession(ctx, sessionID); err != nil {
+func (tm *ToolsManager) endSession(ctx context.Context, args EndSessionArgs, session *SessionContext) error {
+	if err := tm.sessionRepo.EndSession(ctx, session.SessionID); err != nil {
 		return fmt.Errorf("failed to end session: %w", err)
 	}
 
 	activity := &models.ChatActivity{
-		SessionID: sessionID,
-		ChannelID: channelID,
+		SessionID: session.SessionID,
+		ChannelID: session.ChannelID,
 		Action:    models.ActivityEndSession,
 		Data:      args,
 	}
@@ -145,7 +170,7 @@ func (tm *ToolsManager) endSession(ctx context.Context, args EndSessionArgs, ses
 		log.Printf("Failed to log EndSession activity: %v", err)
 	}
 
-	log.Printf("Session %s ended successfully", sessionID.Hex())
+	log.Printf("Session %s ended successfully", session.SessionID.Hex())
 	return nil
 }
 
@@ -160,24 +185,28 @@ type ToolResult struct {
 	Error   string      `json:"error,omitempty"`
 }
 
-func (tm *ToolsManager) ExecuteTool(ctx context.Context, toolCall ToolCall, sessionID primitive.ObjectID, channelID, userID, senderID string) (*ToolResult, error) {
+func (tm *ToolsManager) ExecuteTool(ctx context.Context, toolCall ToolCall, session *SessionContext) (*ToolResult, error) {
 	switch toolCall.Name {
 	case "TriggerBuy":
 		var args TriggerBuyArgs
 		if err := convertArgs(toolCall.Args, &args); err != nil {
 			return &ToolResult{Success: false, Error: err.Error()}, nil
 		}
-		if err := tm.triggerBuy(ctx, args, sessionID, channelID, userID); err != nil {
+		if err := tm.triggerBuy(ctx, args, session); err != nil {
 			return &ToolResult{Success: false, Error: err.Error()}, nil
 		}
-		return &ToolResult{Success: true, Result: "Purchase intent logged successfully"}, nil
+		result := "Purchase intent logged successfully"
+		if args.Message != "" {
+			result += " and message sent to channel"
+		}
+		return &ToolResult{Success: true, Result: result}, nil
 
 	case "ReplyMessage":
 		var args ReplyMessageArgs
 		if err := convertArgs(toolCall.Args, &args); err != nil {
 			return &ToolResult{Success: false, Error: err.Error()}, nil
 		}
-		if err := tm.replyMessage(ctx, args, sessionID, channelID, senderID); err != nil {
+		if err := tm.replyMessage(ctx, args, session); err != nil {
 			return &ToolResult{Success: false, Error: err.Error()}, nil
 		}
 		return &ToolResult{Success: true, Result: "Message sent successfully"}, nil
@@ -187,7 +216,7 @@ func (tm *ToolsManager) ExecuteTool(ctx context.Context, toolCall ToolCall, sess
 		if err := convertArgs(toolCall.Args, &args); err != nil {
 			return &ToolResult{Success: false, Error: err.Error()}, nil
 		}
-		history, err := tm.fetchMessages(ctx, args, sessionID, channelID, userID)
+		history, err := tm.fetchMessages(ctx, args, session)
 		if err != nil {
 			return &ToolResult{Success: false, Error: err.Error()}, nil
 		}
@@ -198,7 +227,7 @@ func (tm *ToolsManager) ExecuteTool(ctx context.Context, toolCall ToolCall, sess
 		if err := convertArgs(toolCall.Args, &args); err != nil {
 			return &ToolResult{Success: false, Error: err.Error()}, nil
 		}
-		if err := tm.endSession(ctx, args, sessionID, channelID); err != nil {
+		if err := tm.endSession(ctx, args, session); err != nil {
 			return &ToolResult{Success: false, Error: err.Error()}, nil
 		}
 		return &ToolResult{Success: true, Result: "Session ended successfully"}, nil

@@ -48,7 +48,7 @@ type PurchaseIntent struct {
 	ChannelID  string             `bson:"channel_id" json:"channel_id"`
 	UserID     string             `bson:"user_id" json:"user_id"`
 	ItemName   string             `bson:"item_name" json:"item_name"`
-	ItemPrice  float64            `bson:"item_price" json:"item_price"`
+	ItemPrice  string             `bson:"item_price" json:"item_price"`
 	Intent     string             `bson:"intent" json:"intent"`
 	CreatedAt  time.Time          `bson:"created_at" json:"created_at"`
 }

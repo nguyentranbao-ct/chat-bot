@@ -9,6 +9,7 @@ type Config struct {
 	Database DatabaseConfig `envPrefix:"DATABASE_"`
 	ChatAPI  ChatAPIConfig  `envPrefix:"CHAT_API_"`
 	LLM      LLMConfig      `envPrefix:"LLM_"`
+	Kafka    KafkaConfig    `envPrefix:"KAFKA_"`
 }
 
 type ServerConfig struct {
@@ -31,6 +32,14 @@ type LLMConfig struct {
 	OpenAIAPIKey    string `env:"OPENAI_API_KEY"`
 	AnthropicAPIKey string `env:"ANTHROPIC_API_KEY"`
 	GoogleAIAPIKey  string `env:"GOOGLE_AI_API_KEY"`
+}
+
+type KafkaConfig struct {
+	Enabled       bool     `env:"ENABLED" envDefault:"false"`
+	Brokers       []string `env:"BROKERS" envSeparator:"," envDefault:"kafka-08.ct.dev:9200"`
+	Topic         string   `env:"TOPIC" envDefault:"chat.event.messages"`
+	ConsumerGroup string   `env:"CONSUMER_GROUP" envDefault:"chat-bot-consumers"`
+	Whitelist     []string `env:"CHANNEL_WHITELIST" envSeparator:","`
 }
 
 func Load() (*Config, error) {

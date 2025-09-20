@@ -25,12 +25,13 @@ type OutgoingMessage struct {
 }
 
 type ChannelInfo struct {
-	ID              string        `json:"id"`
-	Name            string        `json:"name"`
-	ItemName        string        `json:"item_name"`
-	ItemPrice       string        `json:"item_price"`
-	RoleDescription string        `json:"role_description"`
-	Participants    []Participant `json:"participants"`
+	ID             string        `json:"id"`
+	Name           string        `json:"name"`
+	ItemName       string        `json:"item_name"`
+	ItemPrice      string        `json:"item_price"`
+	CurrentProduct string        `json:"current_product"`
+	Context        string        `json:"context"`
+	Participants   []Participant `json:"participants"`
 }
 
 type Participant struct {

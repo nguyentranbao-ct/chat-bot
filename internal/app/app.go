@@ -9,9 +9,11 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/client"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
 	"github.com/nguyentranbao-ct/chat-bot/internal/handler"
+	"github.com/nguyentranbao-ct/chat-bot/internal/kafka"
 	"github.com/nguyentranbao-ct/chat-bot/internal/llm"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repository"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repository/mongodb"
+	"github.com/nguyentranbao-ct/chat-bot/internal/service"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
 	"go.uber.org/fx"
 )
@@ -27,9 +29,12 @@ func NewApp() *fx.App {
 			NewGenkitService,
 			NewMessageUsecase,
 			NewMessageHandler,
+			NewWhitelistService,
+			NewKafkaMessageHandler,
+			NewKafkaConsumer,
 			NewEchoServer,
 		),
-		fx.Invoke(StartServer),
+		fx.Invoke(StartServer, StartKafkaConsumer),
 	)
 }
 
@@ -98,6 +103,18 @@ func NewEchoServer(messageHandler *handler.MessageHandler) *echo.Echo {
 	return e
 }
 
+func NewWhitelistService(cfg *config.Config) service.WhitelistService {
+	return service.NewWhitelistService(&cfg.Kafka)
+}
+
+func NewKafkaMessageHandler(messageUsecase usecase.MessageUsecase) kafka.MessageHandler {
+	return kafka.NewMessageHandler(messageUsecase)
+}
+
+func NewKafkaConsumer(cfg *config.Config, handler kafka.MessageHandler, whitelist service.WhitelistService) (kafka.Consumer, error) {
+	return kafka.NewConsumer(&cfg.Kafka, handler, whitelist)
+}
+
 func StartServer(lc fx.Lifecycle, e *echo.Echo, cfg *config.Config) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -111,6 +128,22 @@ func StartServer(lc fx.Lifecycle, e *echo.Echo, cfg *config.Config) {
 		},
 		OnStop: func(ctx context.Context) error {
 			return e.Shutdown(ctx)
+		},
+	})
+}
+
+func StartKafkaConsumer(lc fx.Lifecycle, consumer kafka.Consumer) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			go func() {
+				if err := consumer.Start(ctx); err != nil {
+					panic(fmt.Sprintf("Failed to start Kafka consumer: %v", err))
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			return consumer.Stop()
 		},
 	})
 }

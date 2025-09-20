@@ -1,5 +1,5 @@
 # Go Chat-Bot Service Makefile
-.PHONY: help build test lint mock clean run dev fmt vet deps
+.PHONY: help build test lint mock clean run dev fmt vet deps kafka-enable kafka-disable kafka-status
 
 # Variables
 BINARY_NAME=chat-bot
@@ -19,6 +19,9 @@ help:
 	@echo "  run       - Run the application"
 	@echo "  dev       - Run in development mode with hot reload"
 	@echo "  clean     - Clean build artifacts"
+	@echo "  kafka-enable  - Enable Kafka consumer"
+	@echo "  kafka-disable - Disable Kafka consumer"
+	@echo "  kafka-status  - Show Kafka configuration status"
 
 # Build the binary
 build:
@@ -106,3 +109,22 @@ db-down:
 # Full development setup
 setup: deps install-tools
 	@echo "Development environment setup complete!"
+
+# Kafka commands
+kafka-enable:
+	@echo "Enabling Kafka consumer..."
+	@echo "Set KAFKA_ENABLED=true in your environment"
+	@echo "Example: export KAFKA_ENABLED=true"
+
+kafka-disable:
+	@echo "Disabling Kafka consumer..."
+	@echo "Set KAFKA_ENABLED=false in your environment"
+	@echo "Example: export KAFKA_ENABLED=false"
+
+kafka-status:
+	@echo "Kafka Configuration Status:"
+	@echo "KAFKA_ENABLED: $${KAFKA_ENABLED:-false}"
+	@echo "KAFKA_BROKERS: $${KAFKA_BROKERS:-kafka-08.ct.dev:9200}"
+	@echo "KAFKA_TOPIC: $${KAFKA_TOPIC:-chat.event.messages}"
+	@echo "KAFKA_CONSUMER_GROUP: $${KAFKA_CONSUMER_GROUP:-chat-bot-consumers}"
+	@echo "KAFKA_CHANNEL_WHITELIST: $${KAFKA_CHANNEL_WHITELIST:-<empty>}"

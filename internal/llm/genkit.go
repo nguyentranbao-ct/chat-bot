@@ -66,15 +66,27 @@ func (gs *GenkitService) defineTools(ctx context.Context, data *PromptData) erro
 		otherUserID = "chat-bot" // Default fallback
 	}
 
+	// Create session context for tool operations
+	session := &SessionContext{
+		SessionID: sessionID,
+		ChannelID: channelID,
+		UserID:    userID,
+		SenderID:  otherUserID,
+	}
+
 	// Define TriggerBuy tool
 	triggerBuyTool := genkit.DefineTool(gs.genkit, "TriggerBuy", "Logs purchase intent and notifies sellers when a user shows buying interest",
 		func(toolCtx *ai.ToolContext, input TriggerBuyArgs) (string, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
-			if err := gs.toolsManager.triggerBuy(timeoutCtx, input, sessionID, channelID, userID); err != nil {
+			if err := gs.toolsManager.triggerBuy(timeoutCtx, input, session); err != nil {
 				return "", err
 			}
-			return "Purchase intent logged successfully", nil
+			result := "Purchase intent logged successfully"
+			if input.Message != "" {
+				result += " and message sent to channel"
+			}
+			return result, nil
 		})
 
 	// Define ReplyMessage tool
@@ -82,7 +94,7 @@ func (gs *GenkitService) defineTools(ctx context.Context, data *PromptData) erro
 		func(toolCtx *ai.ToolContext, input ReplyMessageArgs) (string, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
-			if err := gs.toolsManager.replyMessage(timeoutCtx, input, sessionID, channelID, otherUserID); err != nil {
+			if err := gs.toolsManager.replyMessage(timeoutCtx, input, session); err != nil {
 				return "", err
 			}
 			return "Message sent successfully", nil
@@ -93,7 +105,7 @@ func (gs *GenkitService) defineTools(ctx context.Context, data *PromptData) erro
 		func(toolCtx *ai.ToolContext, input FetchMessagesArgs) (*models.MessageHistory, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
-			return gs.toolsManager.fetchMessages(timeoutCtx, input, sessionID, channelID, userID)
+			return gs.toolsManager.fetchMessages(timeoutCtx, input, session)
 		})
 
 	// Define EndSession tool
@@ -101,7 +113,7 @@ func (gs *GenkitService) defineTools(ctx context.Context, data *PromptData) erro
 		func(toolCtx *ai.ToolContext, input EndSessionArgs) (string, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
-			if err := gs.toolsManager.endSession(timeoutCtx, input, sessionID, channelID); err != nil {
+			if err := gs.toolsManager.endSession(timeoutCtx, input, session); err != nil {
 				return "", err
 			}
 			return "Session ended successfully", nil
@@ -142,7 +154,7 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 		// Convert tools to ToolRef
 		var toolRefs []ai.ToolRef
 		for _, tool := range availableTools {
-			toolRefs = append(toolRefs, ai.ToolRef(tool))
+			toolRefs = append(toolRefs, tool)
 		}
 
 		// Generate response using real Genkit API

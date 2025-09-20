@@ -62,14 +62,21 @@ func (c *chatAPIClient) GetChannelInfo(ctx context.Context, channelID string) (*
 	// Use the first user channel data to get channel info
 	firstChannel := resp.Data[0]
 
+	// Build current product info from item name and price
+	currentProduct := firstChannel.ItemName
+	if firstChannel.ItemPrice != "" {
+		currentProduct = fmt.Sprintf("%s - %s", firstChannel.ItemName, firstChannel.ItemPrice)
+	}
+
 	// Convert chat-api response to our internal model
 	channelInfo := &models.ChannelInfo{
-		ID:              firstChannel.ChannelID,
-		Name:            firstChannel.Name,
-		ItemName:        firstChannel.ItemName,
-		ItemPrice:       firstChannel.ItemPrice,
-		RoleDescription: getMetadataString(firstChannel.Metadata, "role_description"),
-		Participants:    make([]models.Participant, 0, len(resp.Data)),
+		ID:             firstChannel.ChannelID,
+		Name:           firstChannel.Name,
+		ItemName:       firstChannel.ItemName,
+		ItemPrice:      firstChannel.ItemPrice,
+		CurrentProduct: currentProduct,
+		Context:        getMetadataString(firstChannel.Metadata, "context"),
+		Participants:   make([]models.Participant, 0, len(resp.Data)),
 	}
 
 	// Convert all user channels to participants
@@ -117,7 +124,7 @@ func (c *chatAPIClient) GetMessageHistory(ctx context.Context, userID, channelID
 			ChannelID: msg.ChannelID,
 			SenderID:  msg.SenderID,
 			Message:   msg.Message,
-			CreatedAt: time.Unix(msg.CreatedAt/1000, (msg.CreatedAt%1000)*1000000), // Convert from milliseconds
+			CreatedAt: time.UnixMilli(msg.CreatedAt), // Convert from milliseconds
 		}
 		history.Messages = append(history.Messages, historyMsg)
 	}
@@ -157,16 +164,4 @@ func getMetadataString(metadata map[string]interface{}, key string) string {
 		}
 	}
 	return ""
-}
-
-// Helper function to parse string to float64
-func parseFloat64(s string) float64 {
-	if s == "" {
-		return 0
-	}
-	var result float64
-	if _, err := fmt.Sscanf(s, "%f", &result); err == nil {
-		return result
-	}
-	return 0
 }
