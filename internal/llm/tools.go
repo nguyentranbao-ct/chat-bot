@@ -23,16 +23,21 @@ type SessionContext interface {
 	// Session control methods
 	EndSession() error
 	IsEnded() bool
+
+	// Message timestamp tracking for pagination
+	GetNextMessageTimestamp() *int64
+	SaveNextMessageTimestamp(timestamp int64)
 }
 
 // sessionContext is the concrete implementation of SessionContext
 type sessionContext struct {
-	sessionID   primitive.ObjectID
-	channelID   string
-	userID      string
-	senderID    string
-	ended       bool
-	sessionRepo repository.ChatSessionRepository
+	sessionID            primitive.ObjectID
+	channelID            string
+	userID               string
+	senderID             string
+	ended                bool
+	nextMessageTimestamp *int64
+	sessionRepo          repository.ChatSessionRepository
 }
 
 type ToolsManager struct {
@@ -113,11 +118,20 @@ func (s *sessionContext) IsEnded() bool {
 	return s.ended
 }
 
+// Message timestamp tracking methods
+func (s *sessionContext) GetNextMessageTimestamp() *int64 {
+	return s.nextMessageTimestamp
+}
+
+func (s *sessionContext) SaveNextMessageTimestamp(timestamp int64) {
+	s.nextMessageTimestamp = &timestamp
+}
+
 type TriggerBuyArgs struct {
 	ItemName  string `json:"item_name"`
 	ItemPrice string `json:"item_price"`
 	Intent    string `json:"intent"`
-	Message   string `json:"message,omitempty"` // Optional message to send to channel
+	Message   string `json:"message,omitempty"` // Internal field for background processing
 }
 
 type ReplyMessageArgs struct {
@@ -125,7 +139,8 @@ type ReplyMessageArgs struct {
 }
 
 type FetchMessagesArgs struct {
-	Limit int `json:"limit"`
+	Limit    int    `json:"limit"`
+	BeforeTs *int64 `json:"before_ts,omitempty"`
 }
 
 type EndSessionArgs struct{}
@@ -144,12 +159,12 @@ func (tm *ToolsManager) triggerBuy(ctx context.Context, args TriggerBuyArgs, ses
 		return fmt.Errorf("failed to create purchase intent: %w", err)
 	}
 
-	// Send message to channel if provided
+	// Send message to channel if provided (background process, not exposed to LLM)
 	if args.Message != "" {
 		message := &models.OutgoingMessage{
 			ChannelID: session.GetChannelID(),
 			SenderID:  session.GetSenderID(),
-			Message:   args.Message,
+			Message:   `[PURCHASE_INTENT] ` + args.Message,
 		}
 
 		if err := tm.chatAPIClient.SendMessage(ctx, message); err != nil {
@@ -201,14 +216,41 @@ func (tm *ToolsManager) replyMessage(ctx context.Context, args ReplyMessageArgs,
 	return nil
 }
 
+func minMax(current, minVal, maxVal int) int {
+	if current < minVal {
+		return minVal
+	}
+	if current > maxVal {
+		return maxVal
+	}
+	return current
+}
+
 func (tm *ToolsManager) fetchMessages(ctx context.Context, args FetchMessagesArgs, session SessionContext) (*models.MessageHistory, error) {
-	if args.Limit == 0 {
-		args.Limit = 100
+	args.Limit = minMax(args.Limit, 20, 100)
+
+	// Use BeforeTs from args if provided, otherwise use session's saved timestamp
+	beforeTs := args.BeforeTs
+	if beforeTs == nil {
+		beforeTs = session.GetNextMessageTimestamp()
 	}
 
-	history, err := tm.chatAPIClient.GetMessageHistory(ctx, session.GetUserID(), session.GetChannelID(), args.Limit)
+	req := client.MessageHistoryRequest{
+		UserID:    session.GetUserID(),
+		ChannelID: session.GetChannelID(),
+		Limit:     args.Limit,
+		BeforeTs:  beforeTs,
+	}
+
+	history, err := tm.chatAPIClient.GetMessageHistoryWithParams(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch messages: %w", err)
+	}
+
+	// Save the timestamp of the oldest message for next pagination
+	if len(history.Messages) > 0 {
+		oldestMessage := history.Messages[len(history.Messages)-1]
+		session.SaveNextMessageTimestamp(oldestMessage.CreatedAt.UnixMilli())
 	}
 
 	activity := &models.ChatActivity{
@@ -268,11 +310,7 @@ func (tm *ToolsManager) ExecuteTool(ctx context.Context, toolCall ToolCall, sess
 		if err := tm.triggerBuy(ctx, args, session); err != nil {
 			return &ToolResult{Success: false, Error: err.Error()}, nil
 		}
-		result := "Purchase intent logged successfully"
-		if args.Message != "" {
-			result += " and message sent to channel"
-		}
-		return &ToolResult{Success: true, Result: result}, nil
+		return &ToolResult{Success: true, Result: "Purchase intent logged successfully"}, nil
 
 	case "ReplyMessage":
 		var args ReplyMessageArgs

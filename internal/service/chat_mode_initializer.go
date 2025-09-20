@@ -32,9 +32,9 @@ func (s *chatModeInitializer) InitializeDefaultChatModes(ctx context.Context) er
 		return fmt.Errorf("failed to unmarshal default chat modes: %w", err)
 	}
 
-	log.Infow("Loaded chat modes from YAML", "count", len(defaultModes))
+	log.Debugw("Loaded chat modes from YAML", "count", len(defaultModes))
 	for i, mode := range defaultModes {
-		log.Infow("Chat mode details",
+		log.Debugw("Chat mode details",
 			"index", i,
 			"name", mode.Name,
 			"model", mode.Model,

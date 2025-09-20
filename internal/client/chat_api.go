@@ -12,9 +12,17 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 )
 
+type MessageHistoryRequest struct {
+	UserID    string
+	ChannelID string
+	Limit     int
+	BeforeTs  *int64
+}
+
 type ChatAPIClient interface {
 	GetChannelInfo(ctx context.Context, channelID string) (*models.ChannelInfo, error)
 	GetMessageHistory(ctx context.Context, userID, channelID string, limit int) (*models.MessageHistory, error)
+	GetMessageHistoryWithParams(ctx context.Context, req MessageHistoryRequest) (*models.MessageHistory, error)
 	SendMessage(ctx context.Context, message *models.OutgoingMessage) error
 }
 
@@ -96,15 +104,26 @@ func (c *chatAPIClient) GetChannelInfo(ctx context.Context, channelID string) (*
 }
 
 func (c *chatAPIClient) GetMessageHistory(ctx context.Context, userID, channelID string, limit int) (*models.MessageHistory, error) {
+	req := MessageHistoryRequest{
+		UserID:    userID,
+		ChannelID: channelID,
+		Limit:     limit,
+		BeforeTs:  nil,
+	}
+	return c.GetMessageHistoryWithParams(ctx, req)
+}
+
+func (c *chatAPIClient) GetMessageHistoryWithParams(ctx context.Context, req MessageHistoryRequest) (*models.MessageHistory, error) {
 	// Create timeout context
 	timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	request := types.GetChannelMessagesRequest{
 		ProjectID: c.projectID,
-		UserID:    userID,
-		ChannelID: channelID,
-		Limit:     uint(limit),
+		UserID:    req.UserID,
+		ChannelID: req.ChannelID,
+		BeforeTS:  req.BeforeTs,
+		Limit:     uint(req.Limit),
 		Order:     "desc",
 	}
 
@@ -116,7 +135,7 @@ func (c *chatAPIClient) GetMessageHistory(ctx context.Context, userID, channelID
 	// Convert chat-api response to our internal model
 	history := &models.MessageHistory{
 		Messages: make([]models.HistoryMessage, 0, len(resp.Data)),
-		HasMore:  false, // This field doesn't exist in the response, defaulting to false
+		HasMore:  len(resp.Data) == int(request.Limit), // HasMore if we got the full limit
 	}
 
 	for _, msg := range resp.Data {

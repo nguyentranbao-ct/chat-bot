@@ -75,12 +75,21 @@ func (uc *messageUsecase) ProcessMessage(ctx context.Context, message *models.In
 	// Find sender role from channel participants
 	senderRole := findSenderRole(channelInfo, message.SenderID)
 
+	// Fetch 20 recent messages for context
+	recentMessages, err := uc.fetchRecentMessages(ctx, message.SenderID, message.ChannelID)
+	if err != nil {
+		log.Printf("Failed to fetch recent messages: %v", err)
+		// Continue without recent messages rather than failing
+		recentMessages = &models.MessageHistory{Messages: []models.HistoryMessage{}}
+	}
+
 	promptData := &llm.PromptData{
-		ChannelInfo: channelInfo,
-		SessionID:   session.ID.Hex(),
-		UserID:      message.SenderID,
-		SenderRole:  senderRole,
-		Message:     message.Message,
+		ChannelInfo:    channelInfo,
+		SessionID:      session.ID.Hex(),
+		UserID:         message.SenderID,
+		SenderRole:     senderRole,
+		Message:        message.Message,
+		RecentMessages: recentMessages,
 	}
 
 	if err := uc.genkitService.ProcessMessage(ctx, chatMode, promptData); err != nil {
@@ -134,4 +143,14 @@ func findSellerIDFromChannel(channelInfo *models.ChannelInfo) string {
 		}
 	}
 	return ""
+}
+
+func (uc *messageUsecase) fetchRecentMessages(ctx context.Context, userID, channelID string) (*models.MessageHistory, error) {
+	req := client.MessageHistoryRequest{
+		UserID:    userID,
+		ChannelID: channelID,
+		Limit:     20,
+		BeforeTs:  nil,
+	}
+	return uc.chatAPIClient.GetMessageHistoryWithParams(ctx, req)
 }

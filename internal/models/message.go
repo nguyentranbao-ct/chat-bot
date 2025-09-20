@@ -17,7 +17,7 @@ type KafkaMessageData struct {
 	Message                       string                 `json:"message" validate:"required"`
 	FilterMsg                     *string                `json:"filter_msg"`
 	Metadata                      map[string]interface{} `json:"metadata"`
-	Attachment                    *string                `json:"attachment"`
+	Attachment                    interface{}            `json:"attachment"`
 	ReceiverIDs                   []string               `json:"receiver_ids"`
 	ReceiverIDsForSpamMessage     []string               `json:"receiver_ids_for_spam_message"`
 	ClientGenID                   string                 `json:"client_gen_id"`

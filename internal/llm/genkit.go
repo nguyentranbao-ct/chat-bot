@@ -52,27 +52,24 @@ func NewGenkitService(cfg *config.Config, toolsManager *ToolsManager) (*GenkitSe
 }
 
 type PromptData struct {
-	ChannelInfo *models.ChannelInfo
-	SessionID   string
-	UserID      string
-	SenderRole  string
-	Message     string
+	ChannelInfo    *models.ChannelInfo
+	SessionID      string
+	UserID         string
+	SenderRole     string
+	Message        string
+	RecentMessages *models.MessageHistory
 }
 
 func (gs *GenkitService) initializeTools(ctx context.Context) error {
 	// Define TriggerBuy tool
-	triggerBuyTool := genkit.DefineTool(gs.genkit, "TriggerBuy", "Logs purchase intent and notifies sellers when a user shows buying interest",
+	triggerBuyTool := genkit.DefineTool(gs.genkit, "TriggerBuy", "Logs purchase intent when a user shows buying interest",
 		func(toolCtx *ai.ToolContext, input TriggerBuyArgs) (string, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
 			if err := gs.toolsManager.triggerBuy(timeoutCtx, input, gs.currentSession); err != nil {
 				return "", err
 			}
-			result := "Purchase intent logged successfully"
-			if input.Message != "" {
-				result += " and message sent to channel"
-			}
-			return result, nil
+			return "Purchase intent logged successfully", nil
 		})
 
 	// Define ReplyMessage tool
@@ -177,8 +174,26 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 	// Build initial messages
 	messages := []*ai.Message{
 		ai.NewSystemTextMessage(prompt),
-		ai.NewUserTextMessage(data.Message),
 	}
+
+	// Add recent messages as conversation history
+	if data.RecentMessages != nil && len(data.RecentMessages.Messages) > 0 {
+		for _, msg := range data.RecentMessages.Messages {
+			// Determine the role based on sender ID
+			if msg.SenderID == data.UserID {
+				messages = append(messages, ai.NewUserTextMessage(msg.Message))
+			} else {
+				messages = append(messages, ai.NewModelTextMessage(msg.Message))
+			}
+		}
+
+		// Save the timestamp of the oldest message for pagination
+		oldestMessage := data.RecentMessages.Messages[len(data.RecentMessages.Messages)-1]
+		session.SaveNextMessageTimestamp(oldestMessage.CreatedAt.UnixMilli())
+	}
+
+	// Add the current message
+	messages = append(messages, ai.NewUserTextMessage(data.Message))
 
 	// Agent loop: iterate until no more tools are called or max iterations reached
 	for i := 0; i < chatMode.MaxIterations; i++ {
