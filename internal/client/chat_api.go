@@ -67,7 +67,7 @@ func (c *chatAPIClient) GetChannelInfo(ctx context.Context, channelID string) (*
 		ID:              firstChannel.ChannelID,
 		Name:            firstChannel.Name,
 		ItemName:        firstChannel.ItemName,
-		ItemPrice:       parseFloat64(firstChannel.ItemPrice),
+		ItemPrice:       firstChannel.ItemPrice,
 		RoleDescription: getMetadataString(firstChannel.Metadata, "role_description"),
 		Participants:    make([]models.Participant, 0, len(resp.Data)),
 	}
@@ -157,25 +157,6 @@ func getMetadataString(metadata map[string]interface{}, key string) string {
 		}
 	}
 	return ""
-}
-
-func getMetadataFloat64(metadata map[string]interface{}, key string) float64 {
-	if metadata == nil {
-		return 0
-	}
-	if value, ok := metadata[key]; ok {
-		switch v := value.(type) {
-		case float64:
-			return v
-		case float32:
-			return float64(v)
-		case int:
-			return float64(v)
-		case int64:
-			return float64(v)
-		}
-	}
-	return 0
 }
 
 // Helper function to parse string to float64

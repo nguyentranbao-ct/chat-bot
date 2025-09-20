@@ -3,11 +3,11 @@ package models
 import "time"
 
 type IncomingMessage struct {
-	ChannelID string               `json:"channel_id" validate:"required"`
-	CreatedAt int64                `json:"created_at" validate:"required"`
-	SenderID  string               `json:"sender_id" validate:"required"`
-	Message   string               `json:"message" validate:"required"`
-	Metadata  IncomingMessageMeta  `json:"metadata"`
+	ChannelID string              `json:"channel_id" validate:"required"`
+	CreatedAt int64               `json:"created_at" validate:"required"`
+	SenderID  string              `json:"sender_id" validate:"required"`
+	Message   string              `json:"message" validate:"required"`
+	Metadata  IncomingMessageMeta `json:"metadata"`
 }
 
 type IncomingMessageMeta struct {
@@ -25,12 +25,12 @@ type OutgoingMessage struct {
 }
 
 type ChannelInfo struct {
-	ID              string          `json:"id"`
-	Name            string          `json:"name"`
-	ItemName        string          `json:"item_name"`
-	ItemPrice       float64         `json:"item_price"`
-	RoleDescription string          `json:"role_description"`
-	Participants    []Participant   `json:"participants"`
+	ID              string        `json:"id"`
+	Name            string        `json:"name"`
+	ItemName        string        `json:"item_name"`
+	ItemPrice       string        `json:"item_price"`
+	RoleDescription string        `json:"role_description"`
+	Participants    []Participant `json:"participants"`
 }
 
 type Participant struct {
