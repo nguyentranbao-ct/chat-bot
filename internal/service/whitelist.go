@@ -7,36 +7,36 @@ import (
 )
 
 type whitelistService struct {
-	allowedChannels map[string]bool
-	whitelist       []string
+	allowedSellers map[string]bool
+	whitelist      []string
 }
 
 // NewWhitelistService creates a new whitelist service
 func NewWhitelistService(cfg *config.KafkaConfig) WhitelistService {
-	allowedChannels := make(map[string]bool)
-	for _, channelID := range cfg.Whitelist {
-		if channelID = strings.TrimSpace(channelID); channelID != "" {
-			allowedChannels[channelID] = true
+	allowedSellers := make(map[string]bool)
+	for _, sellerID := range cfg.Whitelist {
+		if sellerID = strings.TrimSpace(sellerID); sellerID != "" {
+			allowedSellers[sellerID] = true
 		}
 	}
 
 	return &whitelistService{
-		allowedChannels: allowedChannels,
-		whitelist:       cfg.Whitelist,
+		allowedSellers: allowedSellers,
+		whitelist:      cfg.Whitelist,
 	}
 }
 
-// IsChannelAllowed checks if a channel is in the whitelist
-func (w *whitelistService) IsChannelAllowed(channelID string) bool {
-	// If whitelist is empty, allow all channels
-	if len(w.allowedChannels) == 0 {
+// IsSellerAllowed checks if a seller is in the whitelist
+func (w *whitelistService) IsSellerAllowed(sellerID string) bool {
+	// If whitelist is empty, allow all sellers
+	if len(w.allowedSellers) == 0 {
 		return true
 	}
 
-	return w.allowedChannels[channelID]
+	return w.allowedSellers[sellerID]
 }
 
-// GetWhitelistedChannels returns the list of whitelisted channels
-func (w *whitelistService) GetWhitelistedChannels() []string {
+// GetWhitelistedSellers returns the list of whitelisted sellers
+func (w *whitelistService) GetWhitelistedSellers() []string {
 	return w.whitelist
 }

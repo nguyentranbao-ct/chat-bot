@@ -329,7 +329,7 @@ Reply sent successfully.
 
 ## 10. Continue Loop or End
 
-**Loop Continuation:** The agent loop continues until the LLM decides to end it. The loop ends when:
+**Loop Continuation:** The agent loop continues until the LLM decides to end it. The loop ends condition:
 
 1. **End without Tool Use:** LLM responds without specifying a tool, either with "Final Answer: [response]" or without it (ending based on context or max iterations).
 2. **End with Tool Use:** LLM specifies a tool, either with "Final Answer: [response]" in the same response (execute tool, then end) or as a final action (e.g., TriggerBuy Tool; execute and end).

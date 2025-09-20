@@ -66,6 +66,7 @@ func (r *ChatModeRepo) Upsert(ctx context.Context, mode *models.ChatMode) error 
 	update := bson.M{
 		"$set": bson.M{
 			"prompt_template":      mode.PromptTemplate,
+			"condition":           mode.Condition,
 			"model":               mode.Model,
 			"tools":               mode.Tools,
 			"max_iterations":      mode.MaxIterations,

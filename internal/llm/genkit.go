@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
+	"strings"
 	"text/template"
 	"time"
 
+	"github.com/carousell/ct-go/pkg/logger"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
@@ -17,10 +18,11 @@ import (
 )
 
 type GenkitService struct {
-	genkit       *genkit.Genkit
-	toolsManager *ToolsManager
-	config       *config.Config
-	tools        []ai.Tool
+	genkit         *genkit.Genkit
+	toolsManager   *ToolsManager
+	config         *config.Config
+	tools          []ai.Tool
+	currentSession SessionContext // Current session context for tool execution
 }
 
 func NewGenkitService(cfg *config.Config, toolsManager *ToolsManager) (*GenkitService, error) {
@@ -41,6 +43,11 @@ func NewGenkitService(cfg *config.Config, toolsManager *ToolsManager) (*GenkitSe
 		config:       cfg,
 	}
 
+	// Define tools once during initialization
+	if err := gs.initializeTools(ctx); err != nil {
+		return nil, fmt.Errorf("failed to initialize tools: %w", err)
+	}
+
 	return gs, nil
 }
 
@@ -48,10 +55,63 @@ type PromptData struct {
 	ChannelInfo *models.ChannelInfo
 	SessionID   string
 	UserID      string
+	SenderRole  string
 	Message     string
 }
 
-func (gs *GenkitService) defineTools(ctx context.Context, data *PromptData) (SessionContext, error) {
+func (gs *GenkitService) initializeTools(ctx context.Context) error {
+	// Define TriggerBuy tool
+	triggerBuyTool := genkit.DefineTool(gs.genkit, "TriggerBuy", "Logs purchase intent and notifies sellers when a user shows buying interest",
+		func(toolCtx *ai.ToolContext, input TriggerBuyArgs) (string, error) {
+			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+			if err := gs.toolsManager.triggerBuy(timeoutCtx, input, gs.currentSession); err != nil {
+				return "", err
+			}
+			result := "Purchase intent logged successfully"
+			if input.Message != "" {
+				result += " and message sent to channel"
+			}
+			return result, nil
+		})
+
+	// Define ReplyMessage tool
+	replyMessageTool := genkit.DefineTool(gs.genkit, "ReplyMessage", "Send a message to the chat channel via chat-api",
+		func(toolCtx *ai.ToolContext, input ReplyMessageArgs) (string, error) {
+			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+			if err := gs.toolsManager.replyMessage(timeoutCtx, input, gs.currentSession); err != nil {
+				return "", err
+			}
+			return "Message sent successfully", nil
+		})
+
+	// Define FetchMessages tool
+	fetchMessagesTool := genkit.DefineTool(gs.genkit, "FetchMessages", "Fetch additional conversation history from the channel",
+		func(toolCtx *ai.ToolContext, input FetchMessagesArgs) (*models.MessageHistory, error) {
+			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+			return gs.toolsManager.fetchMessages(timeoutCtx, input, gs.currentSession)
+		})
+
+	// Define EndSession tool
+	endSessionTool := genkit.DefineTool(gs.genkit, "EndSession", "Terminate the current AI conversation session",
+		func(toolCtx *ai.ToolContext, input EndSessionArgs) (string, error) {
+			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+			if err := gs.toolsManager.endSession(timeoutCtx, input, gs.currentSession); err != nil {
+				return "", err
+			}
+			return "Session ended successfully", nil
+		})
+
+	// Store tools for later use
+	gs.tools = []ai.Tool{triggerBuyTool, replyMessageTool, fetchMessagesTool, endSessionTool}
+
+	return nil
+}
+
+func (gs *GenkitService) createSessionContext(data *PromptData) (SessionContext, error) {
 	sessionID, err := primitive.ObjectIDFromHex(data.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid session ID: %w", err)
@@ -75,70 +135,41 @@ func (gs *GenkitService) defineTools(ctx context.Context, data *PromptData) (Ses
 		SessionRepo: gs.toolsManager.sessionRepo,
 	})
 
-	// Define TriggerBuy tool
-	triggerBuyTool := genkit.DefineTool(gs.genkit, "TriggerBuy", "Logs purchase intent and notifies sellers when a user shows buying interest",
-		func(toolCtx *ai.ToolContext, input TriggerBuyArgs) (string, error) {
-			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
-			if err := gs.toolsManager.triggerBuy(timeoutCtx, input, session); err != nil {
-				return "", err
-			}
-			result := "Purchase intent logged successfully"
-			if input.Message != "" {
-				result += " and message sent to channel"
-			}
-			return result, nil
-		})
-
-	// Define ReplyMessage tool
-	replyMessageTool := genkit.DefineTool(gs.genkit, "ReplyMessage", "Send a message to the chat channel via chat-api",
-		func(toolCtx *ai.ToolContext, input ReplyMessageArgs) (string, error) {
-			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
-			if err := gs.toolsManager.replyMessage(timeoutCtx, input, session); err != nil {
-				return "", err
-			}
-			return "Message sent successfully", nil
-		})
-
-	// Define FetchMessages tool
-	fetchMessagesTool := genkit.DefineTool(gs.genkit, "FetchMessages", "Fetch additional conversation history from the channel",
-		func(toolCtx *ai.ToolContext, input FetchMessagesArgs) (*models.MessageHistory, error) {
-			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
-			return gs.toolsManager.fetchMessages(timeoutCtx, input, session)
-		})
-
-	// Define EndSession tool
-	endSessionTool := genkit.DefineTool(gs.genkit, "EndSession", "Terminate the current AI conversation session",
-		func(toolCtx *ai.ToolContext, input EndSessionArgs) (string, error) {
-			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
-			if err := gs.toolsManager.endSession(timeoutCtx, input, session); err != nil {
-				return "", err
-			}
-			return "Session ended successfully", nil
-		})
-
-	// Store tools for later use
-	gs.tools = []ai.Tool{triggerBuyTool, replyMessageTool, fetchMessagesTool, endSessionTool}
-
 	return session, nil
 }
 
 func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.ChatMode, data *PromptData) error {
+	log := logger.MustNamed("genkit_service")
+
+	// Evaluate the  condition first
+	shouldProcess, err := gs.evaluateCondition(chatMode.Condition, data)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate when condition: %w", err)
+	}
+	if !shouldProcess {
+		log.Infow("When condition evaluated to false, stopping processing",
+			"chat_mode", chatMode.Name,
+			"sender_role", data.SenderRole,
+			"user_id", data.UserID)
+		return nil
+	}
+	log.Infow("When condition evaluated to true, proceeding with processing",
+		"chat_mode", chatMode.Name,
+		"sender_role", data.SenderRole)
+
 	prompt, err := gs.buildPrompt(chatMode.PromptTemplate, data)
 	if err != nil {
 		return fmt.Errorf("failed to build prompt: %w", err)
 	}
 
-	log.Printf("Processing with chat mode: %s", chatMode.Name)
+	log.Infow("Processing message", "chat_mode", chatMode.Name, "session_id", data.SessionID)
 
-	// Define tools with context data for this request
-	session, err := gs.defineTools(ctx, data)
+	// Create session context for this request and set it as current session
+	session, err := gs.createSessionContext(data)
 	if err != nil {
-		return fmt.Errorf("failed to define tools: %w", err)
+		return fmt.Errorf("failed to create session context: %w", err)
 	}
+	gs.currentSession = session
 
 	// Get available tools for this chat mode
 	availableTools := gs.getToolsForMode(chatMode.Tools)
@@ -151,7 +182,7 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 
 	// Agent loop: iterate until no more tools are called or max iterations reached
 	for i := 0; i < chatMode.MaxIterations; i++ {
-		log.Printf("Agent iteration %d/%d", i+1, chatMode.MaxIterations)
+		log.Infow("Agent iteration", "current", i+1, "max", chatMode.MaxIterations)
 
 		// Convert tools to ToolRef
 		var toolRefs []ai.ToolRef
@@ -164,10 +195,6 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 			ai.WithMessages(messages...),
 			ai.WithModelName(chatMode.Model),
 			ai.WithTools(toolRefs...),
-			ai.WithConfig(&ai.GenerationCommonConfig{
-				MaxOutputTokens: chatMode.MaxResponseTokens,
-				Temperature:     0.7,
-			}),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to generate response: %w", err)
@@ -176,27 +203,69 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 		// Add assistant response to conversation
 		if response.Text() != "" {
 			messages = append(messages, ai.NewModelTextMessage(response.Text()))
-			log.Printf("AI Response: %s", response.Text())
+			log.Infow("AI generated text response", "response", response.Text())
 		}
 
 		// Check if there are tool requests in the response
 		toolRequests := response.ToolRequests()
 		if len(toolRequests) == 0 {
-			log.Printf("No tool requests found, ending conversation")
+			log.Infow("No tool requests found", "ai_response", response.Text())
+			log.Info("Ending conversation - AI did not use any tools")
 			break
 		}
 
-		// Tool execution is handled automatically by Genkit when tools are properly defined
-		// The tool responses will be included in the next iteration automatically
+		log.Infow("Processing tool requests", "count", len(toolRequests))
+
+		// Execute tools and add responses to conversation
+		var toolResponseParts []*ai.Part
+		for _, req := range toolRequests {
+			log.Infow("Executing tool", "tool_name", req.Name)
+
+			// Find the tool by name
+			var tool ai.Tool
+			for _, t := range availableTools {
+				if t.Name() == req.Name {
+					tool = t
+					break
+				}
+			}
+
+			if tool == nil {
+				log.Errorw("Tool not found", "tool_name", req.Name)
+				continue
+			}
+
+			// Execute the tool
+			output, err := tool.RunRaw(ctx, req.Input)
+			if err != nil {
+				log.Errorw("Tool execution failed", "tool_name", req.Name, "error", err)
+				continue
+			}
+
+			log.Infow("Tool executed successfully", "tool_name", req.Name)
+
+			// Add tool response to the conversation
+			toolResponseParts = append(toolResponseParts,
+				ai.NewToolResponsePart(&ai.ToolResponse{
+					Name:   req.Name,
+					Ref:    req.Ref,
+					Output: output,
+				}))
+		}
+
+		// Add tool responses to the conversation
+		if len(toolResponseParts) > 0 {
+			messages = append(messages, ai.NewMessage(ai.RoleTool, nil, toolResponseParts...))
+		}
 
 		// Check if session has been ended by a tool
 		if session.IsEnded() {
-			log.Printf("Session has been terminated by tool execution, ending conversation")
+			log.Info("Session has been terminated by tool execution, ending conversation")
 			break
 		}
 	}
 
-	log.Printf("Agent processing complete for session %s", data.SessionID)
+	log.Infow("Agent processing complete", "session_id", data.SessionID)
 	return nil
 }
 
@@ -212,6 +281,21 @@ func (gs *GenkitService) buildPrompt(templateStr string, data *PromptData) (stri
 	}
 
 	return buf.String(), nil
+}
+
+func (gs *GenkitService) evaluateCondition(whenTemplate string, data *PromptData) (bool, error) {
+	tmpl, err := template.New("when").Parse(whenTemplate)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse when template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return false, fmt.Errorf("failed to execute when template: %w", err)
+	}
+
+	result := strings.TrimSpace(buf.String())
+	return result == "true", nil
 }
 
 func (gs *GenkitService) getToolsForMode(toolNames []string) []ai.Tool {

@@ -2,15 +2,16 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	_ "embed"
 	"fmt"
 
+	"github.com/carousell/ct-go/pkg/logger"
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repository"
+	"gopkg.in/yaml.v3"
 )
 
-//go:embed default_chat_modes.json
+//go:embed default_chat_modes.yaml
 var defaultChatModesData []byte
 
 type chatModeInitializer struct {
@@ -24,9 +25,26 @@ func NewChatModeInitializer(repo repository.ChatModeRepository) ChatModeInitiali
 }
 
 func (s *chatModeInitializer) InitializeDefaultChatModes(ctx context.Context) error {
+	log := logger.MustNamed("chat_mode_initializer")
+
 	var defaultModes []models.ChatMode
-	if err := json.Unmarshal(defaultChatModesData, &defaultModes); err != nil {
+	if err := yaml.Unmarshal(defaultChatModesData, &defaultModes); err != nil {
 		return fmt.Errorf("failed to unmarshal default chat modes: %w", err)
+	}
+
+	log.Infow("Loaded chat modes from YAML", "count", len(defaultModes))
+	for i, mode := range defaultModes {
+		log.Infow("Chat mode details",
+			"index", i,
+			"name", mode.Name,
+			"model", mode.Model,
+			"condition", mode.Condition,
+			"max_iterations", mode.MaxIterations,
+			"max_prompt_tokens", mode.MaxPromptTokens,
+			"max_response_tokens", mode.MaxResponseTokens,
+			"prompt_template_length", len(mode.PromptTemplate),
+			"tools", mode.Tools,
+		)
 	}
 
 	for _, mode := range defaultModes {

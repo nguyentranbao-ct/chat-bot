@@ -27,11 +27,11 @@ type SessionContext interface {
 
 // sessionContext is the concrete implementation of SessionContext
 type sessionContext struct {
-	sessionID primitive.ObjectID
-	channelID string
-	userID    string
-	senderID  string
-	ended     bool
+	sessionID   primitive.ObjectID
+	channelID   string
+	userID      string
+	senderID    string
+	ended       bool
 	sessionRepo repository.ChatSessionRepository
 }
 
@@ -227,6 +227,7 @@ func (tm *ToolsManager) fetchMessages(ctx context.Context, args FetchMessagesArg
 }
 
 func (tm *ToolsManager) endSession(ctx context.Context, args EndSessionArgs, session SessionContext) error {
+	log.Printf("Ending session %s as requested by tool", session.GetSessionID().Hex())
 	// Use the SessionContext's EndSession method
 	if err := session.EndSession(); err != nil {
 		return fmt.Errorf("failed to end session: %w", err)

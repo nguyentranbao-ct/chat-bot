@@ -135,6 +135,7 @@ func NewMessageUsecase(
 	repos *Repositories,
 	chatAPIClient client.ChatAPIClient,
 	genkitService *llm.GenkitService,
+	whitelistService service.WhitelistService,
 ) usecase.MessageUsecase {
 	return usecase.NewMessageUsecase(
 		repos.ChatMode,
@@ -142,6 +143,7 @@ func NewMessageUsecase(
 		repos.Activity,
 		chatAPIClient,
 		genkitService,
+		whitelistService,
 	)
 }
 

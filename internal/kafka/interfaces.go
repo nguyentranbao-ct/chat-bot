@@ -16,8 +16,3 @@ type Consumer interface {
 type MessageHandler interface {
 	HandleMessage(ctx context.Context, message *models.IncomingMessage) error
 }
-
-// WhitelistService defines the interface for channel whitelist management
-type WhitelistService interface {
-	IsChannelAllowed(channelID string) bool
-}

@@ -12,7 +12,6 @@ import (
 	"github.com/carousell/ct-go/pkg/workerpool"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
-	"github.com/nguyentranbao-ct/chat-bot/internal/service"
 	"github.com/nguyentranbao-ct/chat-bot/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/segmentio/kafka-go"
@@ -22,15 +21,14 @@ import (
 )
 
 type kafkaConsumer struct {
-	reader           *kafka.Reader
-	metrics          *prometheus.HistogramVec
-	numWorkers       int
-	consumeTimeout   time.Duration
-	messageHandler   MessageHandler
-	whitelistService service.WhitelistService
-	shutdowner       fx.Shutdowner
-	done             chan struct{}
-	workerPool       workerpool.Pool
+	reader         *kafka.Reader
+	metrics        *prometheus.HistogramVec
+	numWorkers     int
+	consumeTimeout time.Duration
+	messageHandler MessageHandler
+	shutdowner     fx.Shutdowner
+	done           chan struct{}
+	workerPool     workerpool.Pool
 }
 
 // NewConsumer creates a new Kafka consumer
@@ -38,7 +36,6 @@ func NewConsumer(
 	shutdowner fx.Shutdowner,
 	cfg *config.KafkaConfig,
 	handler MessageHandler,
-	whitelist service.WhitelistService,
 ) (Consumer, error) {
 	if !cfg.Enabled {
 		return &noopConsumer{}, nil
@@ -60,14 +57,13 @@ func NewConsumer(
 	wp := workerpool.New(numWorkers)
 
 	return &kafkaConsumer{
-		reader:           kafka.NewReader(readerConfig),
-		metrics:          metrics,
-		numWorkers:       numWorkers,
-		consumeTimeout:   30 * time.Second,
-		messageHandler:   handler,
-		whitelistService: whitelist,
-		done:             make(chan struct{}),
-		workerPool:       wp,
+		reader:         kafka.NewReader(readerConfig),
+		metrics:        metrics,
+		numWorkers:     numWorkers,
+		consumeTimeout: 30 * time.Second,
+		messageHandler: handler,
+		done:           make(chan struct{}),
+		workerPool:     wp,
 	}, nil
 }
 
@@ -208,12 +204,6 @@ func (c *kafkaConsumer) handle(msgCtx context.Context, msg kafka.Message) (durat
 				ChatMode: "sales_assistant",
 			},
 		}, // Initialize with empty metadata for now
-	}
-
-	// Check if channel is whitelisted
-	if !c.whitelistService.IsChannelAllowed(incomingMessage.ChannelID) {
-		log.Infow(msgCtx, "Ignoring message from non-whitelisted channel", "channel_id", incomingMessage.ChannelID)
-		return 0, nil
 	}
 
 	log.Infow(msgCtx, "Processing Kafka message",
