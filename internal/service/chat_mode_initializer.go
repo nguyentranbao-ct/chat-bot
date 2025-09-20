@@ -13,17 +13,17 @@ import (
 //go:embed default_chat_modes.json
 var defaultChatModesData []byte
 
-type ChatModeInitializer struct {
+type chatModeInitializer struct {
 	repo repository.ChatModeRepository
 }
 
-func NewChatModeInitializer(repo repository.ChatModeRepository) *ChatModeInitializer {
-	return &ChatModeInitializer{
+func NewChatModeInitializer(repo repository.ChatModeRepository) ChatModeInitializer {
+	return &chatModeInitializer{
 		repo: repo,
 	}
 }
 
-func (s *ChatModeInitializer) InitializeDefaultChatModes(ctx context.Context) error {
+func (s *chatModeInitializer) InitializeDefaultChatModes(ctx context.Context) error {
 	var defaultModes []models.ChatMode
 	if err := json.Unmarshal(defaultChatModesData, &defaultModes); err != nil {
 		return fmt.Errorf("failed to unmarshal default chat modes: %w", err)

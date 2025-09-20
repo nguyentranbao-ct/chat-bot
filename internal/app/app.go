@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/carousell/ct-go/pkg/logger"
 	"github.com/labstack/echo/v4"
 	"github.com/nguyentranbao-ct/chat-bot/internal/client"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
@@ -16,10 +17,20 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/service"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
+	"go.uber.org/zap/zapcore"
 )
 
 func NewApp() *fx.App {
+	log := logger.MustNamed("app")
 	return fx.New(
+		fx.WithLogger(func() fxevent.Logger {
+			l := &fxevent.ZapLogger{
+				Logger: log.Unwrap().Desugar(),
+			}
+			l.UseLogLevel(zapcore.DebugLevel)
+			return l
+		}),
 		fx.Provide(
 			config.Load,
 			NewMongoDB,
@@ -31,7 +42,7 @@ func NewApp() *fx.App {
 			NewMessageHandler,
 			NewWhitelistService,
 			NewKafkaMessageHandler,
-			NewKafkaConsumer,
+			kafka.NewConsumer,
 			NewEchoServer,
 			NewChatModeInitializer,
 		),
@@ -108,7 +119,7 @@ func NewWhitelistService(cfg *config.Config) service.WhitelistService {
 	return service.NewWhitelistService(&cfg.Kafka)
 }
 
-func NewChatModeInitializer(repos *Repositories) *service.ChatModeInitializer {
+func NewChatModeInitializer(repos *Repositories) service.ChatModeInitializer {
 	return service.NewChatModeInitializer(repos.ChatMode)
 }
 
@@ -116,9 +127,6 @@ func NewKafkaMessageHandler(messageUsecase usecase.MessageUsecase) kafka.Message
 	return kafka.NewMessageHandler(messageUsecase)
 }
 
-func NewKafkaConsumer(cfg *config.Config, handler kafka.MessageHandler, whitelist service.WhitelistService) (kafka.Consumer, error) {
-	return kafka.NewConsumer(&cfg.Kafka, handler, whitelist)
-}
 
 func StartServer(lc fx.Lifecycle, e *echo.Echo, cfg *config.Config) {
 	lc.Append(fx.Hook{
@@ -153,7 +161,7 @@ func StartKafkaConsumer(lc fx.Lifecycle, consumer kafka.Consumer) {
 	})
 }
 
-func InitializeDefaultChatModes(lc fx.Lifecycle, initializer *service.ChatModeInitializer) {
+func InitializeDefaultChatModes(lc fx.Lifecycle, initializer service.ChatModeInitializer) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			if err := initializer.InitializeDefaultChatModes(ctx); err != nil {
