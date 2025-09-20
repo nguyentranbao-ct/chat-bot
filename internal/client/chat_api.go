@@ -26,7 +26,8 @@ func NewChatAPIClient(cfg *config.ChatAPIConfig) ChatAPIClient {
 	config := client.Config{
 		BaseURL:   cfg.BaseURL,
 		Service:   cfg.Service,
-		ProjectID: cfg.ProjectUUID,
+		ProjectID: cfg.ProjectID,
+		Token:     cfg.APIKey,
 	}
 
 	chatClient, err := client.NewClient(config)
@@ -36,7 +37,7 @@ func NewChatAPIClient(cfg *config.ChatAPIConfig) ChatAPIClient {
 
 	return &chatAPIClient{
 		client:    chatClient,
-		projectID: cfg.ProjectUUID,
+		projectID: cfg.ProjectID,
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type ChatModeRepo struct {
@@ -54,6 +55,33 @@ func (r *ChatModeRepo) Update(ctx context.Context, mode *models.ChatMode) error 
 	_, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("failed to update chat mode: %w", err)
+	}
+	return nil
+}
+
+func (r *ChatModeRepo) Upsert(ctx context.Context, mode *models.ChatMode) error {
+	now := time.Now()
+
+	filter := bson.M{"name": mode.Name}
+	update := bson.M{
+		"$set": bson.M{
+			"prompt_template":      mode.PromptTemplate,
+			"model":               mode.Model,
+			"tools":               mode.Tools,
+			"max_iterations":      mode.MaxIterations,
+			"max_prompt_tokens":   mode.MaxPromptTokens,
+			"max_response_tokens": mode.MaxResponseTokens,
+			"updated_at":          now,
+		},
+		"$setOnInsert": bson.M{
+			"_id":        primitive.NewObjectID(),
+			"created_at": now,
+		},
+	}
+
+	_, err := r.collection.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+	if err != nil {
+		return fmt.Errorf("failed to upsert chat mode: %w", err)
 	}
 	return nil
 }

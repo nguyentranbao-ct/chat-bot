@@ -34,7 +34,7 @@ func NewConsumer(cfg *config.KafkaConfig, handler MessageHandler, whitelist Whit
 	saramaConfig.Consumer.Group.Session.Timeout = 10000
 	saramaConfig.Consumer.Group.Heartbeat.Interval = 3000
 
-	consumerGroup, err := sarama.NewConsumerGroup(cfg.Brokers, cfg.ConsumerGroup, saramaConfig)
+	consumerGroup, err := sarama.NewConsumerGroup(cfg.Brokers, cfg.GroupID, saramaConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create consumer group: %w", err)
 	}

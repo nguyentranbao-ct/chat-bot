@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -8,17 +9,43 @@ import (
 )
 
 func SetupMiddleware(e *echo.Echo) {
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-	e.Use(middleware.CORS())
+	e.HTTPErrorHandler = errorHandler()
 
-	e.Use(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
-		Generator: func() string {
-			return generateRequestID()
+	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+		Skipper: func(c echo.Context) bool {
+			uri := c.Request().RequestURI
+			return uri == "/health" || uri == "/metrics"
 		},
 	}))
+	e.Use(middleware.RequestID())
+	e.Use(middleware.Recover())
 
 	e.Use(validateHeaders())
+}
+
+func errorHandler() echo.HTTPErrorHandler {
+	return func(err error, c echo.Context) {
+		var he *echo.HTTPError
+		if errors.As(err, &he) {
+			c.Logger().Error(err)
+		} else {
+			he = &echo.HTTPError{
+				Code:    http.StatusInternalServerError,
+				Message: http.StatusText(http.StatusInternalServerError),
+			}
+		}
+
+		if !c.Response().Committed {
+			if c.Request().Method == http.MethodHead {
+				err = c.NoContent(he.Code)
+			} else {
+				err = c.JSON(he.Code, he)
+			}
+			if err != nil {
+				c.Logger().Error(err)
+			}
+		}
+	}
 }
 
 func validateHeaders() echo.MiddlewareFunc {

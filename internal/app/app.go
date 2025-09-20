@@ -33,8 +33,9 @@ func NewApp() *fx.App {
 			NewKafkaMessageHandler,
 			NewKafkaConsumer,
 			NewEchoServer,
+			NewChatModeInitializer,
 		),
-		fx.Invoke(StartServer, StartKafkaConsumer),
+		fx.Invoke(StartServer, StartKafkaConsumer, InitializeDefaultChatModes),
 	)
 }
 
@@ -107,6 +108,10 @@ func NewWhitelistService(cfg *config.Config) service.WhitelistService {
 	return service.NewWhitelistService(&cfg.Kafka)
 }
 
+func NewChatModeInitializer(repos *Repositories) *service.ChatModeInitializer {
+	return service.NewChatModeInitializer(repos.ChatMode)
+}
+
 func NewKafkaMessageHandler(messageUsecase usecase.MessageUsecase) kafka.MessageHandler {
 	return kafka.NewMessageHandler(messageUsecase)
 }
@@ -144,6 +149,17 @@ func StartKafkaConsumer(lc fx.Lifecycle, consumer kafka.Consumer) {
 		},
 		OnStop: func(ctx context.Context) error {
 			return consumer.Stop()
+		},
+	})
+}
+
+func InitializeDefaultChatModes(lc fx.Lifecycle, initializer *service.ChatModeInitializer) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			if err := initializer.InitializeDefaultChatModes(ctx); err != nil {
+				return fmt.Errorf("failed to initialize default chat modes: %w", err)
+			}
+			return nil
 		},
 	})
 }

@@ -11,6 +11,7 @@ type ChatModeRepository interface {
 	GetByName(ctx context.Context, name string) (*models.ChatMode, error)
 	Create(ctx context.Context, mode *models.ChatMode) error
 	Update(ctx context.Context, mode *models.ChatMode) error
+	Upsert(ctx context.Context, mode *models.ChatMode) error
 	Delete(ctx context.Context, id primitive.ObjectID) error
 	List(ctx context.Context) ([]*models.ChatMode, error)
 }

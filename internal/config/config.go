@@ -23,9 +23,10 @@ type DatabaseConfig struct {
 }
 
 type ChatAPIConfig struct {
-	BaseURL     string `env:"BASE_URL,required"`
-	ProjectUUID string `env:"PROJECT_UUID,required"`
-	Service     string `env:"SERVICE" envDefault:"chat-bot"`
+	BaseURL   string `env:"BASE_URL,required" envDefault:"https://chat-dev.cmco.io"`
+	ProjectID string `env:"PROJECT_UUID,required" envDefault:"16f38160-3afa-4707-b8cb-354d2cbf1590"`
+	APIKey    string `env:"API_KEY,required"`
+	Service   string `env:"SERVICE" envDefault:"chat-bot"`
 }
 
 type LLMConfig struct {
@@ -35,11 +36,11 @@ type LLMConfig struct {
 }
 
 type KafkaConfig struct {
-	Enabled       bool     `env:"ENABLED" envDefault:"false"`
-	Brokers       []string `env:"BROKERS" envSeparator:"," envDefault:"kafka-08.ct.dev:9200"`
-	Topic         string   `env:"TOPIC" envDefault:"chat.event.messages"`
-	ConsumerGroup string   `env:"CONSUMER_GROUP" envDefault:"chat-bot-consumers"`
-	Whitelist     []string `env:"CHANNEL_WHITELIST" envSeparator:","`
+	Enabled   bool     `env:"ENABLED" envDefault:"false"`
+	Brokers   []string `env:"BROKERS" envDefault:"kafka-08.ct.dev:9200"`
+	Topic     string   `env:"TOPIC" envDefault:"chat.event.messages"`
+	GroupID   string   `env:"GROUP_ID" envDefault:"chat-bot-consumers"`
+	Whitelist []string `env:"CHANNEL_WHITELIST" envDefault:"32EOJTjYIHdpC7wuYvCKWDCOpGA"`
 }
 
 func Load() (*Config, error) {
