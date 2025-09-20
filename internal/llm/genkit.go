@@ -13,6 +13,7 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
+	"github.com/nguyentranbao-ct/chat-bot/internal/llm/tools"
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -22,7 +23,7 @@ type GenkitService struct {
 	toolsManager   *ToolsManager
 	config         *config.Config
 	tools          []ai.Tool
-	currentSession SessionContext // Current session context for tool execution
+	currentSession tools.SessionContext
 }
 
 func NewGenkitService(cfg *config.Config, toolsManager *ToolsManager) (*GenkitService, error) {
@@ -61,8 +62,17 @@ type PromptData struct {
 }
 
 func (gs *GenkitService) initializeTools(ctx context.Context) error {
-	// Define TriggerBuy tool
-	triggerBuyTool := genkit.DefineTool(gs.genkit, "TriggerBuy", "Logs purchase intent when a user shows buying interest",
+	triggerBuyTool := gs.createTriggerBuyTool(ctx)
+	replyMessageTool := gs.createReplyMessageTool(ctx)
+	fetchMessagesTool := gs.createFetchMessagesTool(ctx)
+	endSessionTool := gs.createEndSessionTool(ctx)
+
+	gs.tools = []ai.Tool{triggerBuyTool, replyMessageTool, fetchMessagesTool, endSessionTool}
+	return nil
+}
+
+func (gs *GenkitService) createTriggerBuyTool(ctx context.Context) ai.Tool {
+	return genkit.DefineTool(gs.genkit, "TriggerBuy", "Logs purchase intent when a user shows buying interest",
 		func(toolCtx *ai.ToolContext, input TriggerBuyArgs) (string, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
@@ -71,9 +81,10 @@ func (gs *GenkitService) initializeTools(ctx context.Context) error {
 			}
 			return "Purchase intent logged successfully", nil
 		})
+}
 
-	// Define ReplyMessage tool
-	replyMessageTool := genkit.DefineTool(gs.genkit, "ReplyMessage", "Send a message to the chat channel via chat-api",
+func (gs *GenkitService) createReplyMessageTool(ctx context.Context) ai.Tool {
+	return genkit.DefineTool(gs.genkit, "ReplyMessage", "Send a message to the chat channel via chat-api",
 		func(toolCtx *ai.ToolContext, input ReplyMessageArgs) (string, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
@@ -82,17 +93,19 @@ func (gs *GenkitService) initializeTools(ctx context.Context) error {
 			}
 			return "Message sent successfully", nil
 		})
+}
 
-	// Define FetchMessages tool
-	fetchMessagesTool := genkit.DefineTool(gs.genkit, "FetchMessages", "Fetch additional conversation history from the channel",
+func (gs *GenkitService) createFetchMessagesTool(ctx context.Context) ai.Tool {
+	return genkit.DefineTool(gs.genkit, "FetchMessages", "Fetch additional conversation history from the channel",
 		func(toolCtx *ai.ToolContext, input FetchMessagesArgs) (*models.MessageHistory, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
 			return gs.toolsManager.fetchMessages(timeoutCtx, input, gs.currentSession)
 		})
+}
 
-	// Define EndSession tool
-	endSessionTool := genkit.DefineTool(gs.genkit, "EndSession", "Terminate the current AI conversation session",
+func (gs *GenkitService) createEndSessionTool(ctx context.Context) ai.Tool {
+	return genkit.DefineTool(gs.genkit, "EndSession", "Terminate the current AI conversation session",
 		func(toolCtx *ai.ToolContext, input EndSessionArgs) (string, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
@@ -101,14 +114,9 @@ func (gs *GenkitService) initializeTools(ctx context.Context) error {
 			}
 			return "Session ended successfully", nil
 		})
-
-	// Store tools for later use
-	gs.tools = []ai.Tool{triggerBuyTool, replyMessageTool, fetchMessagesTool, endSessionTool}
-
-	return nil
 }
 
-func (gs *GenkitService) createSessionContext(data *PromptData) (SessionContext, error) {
+func (gs *GenkitService) createSessionContext(data *PromptData) (tools.SessionContext, error) {
 	sessionID, err := primitive.ObjectIDFromHex(data.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid session ID: %w", err)
@@ -136,21 +144,15 @@ func (gs *GenkitService) createSessionContext(data *PromptData) (SessionContext,
 }
 
 func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.ChatMode, data *PromptData) error {
-	// Evaluate the  condition first
 	shouldProcess, err := gs.evaluateCondition(chatMode.Condition, data)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate when condition: %w", err)
 	}
 	if !shouldProcess {
-		log.Infow(ctx, "When condition evaluated to false, stopping processing",
-			"chat_mode", chatMode.Name,
-			"sender_role", data.SenderRole,
-			"user_id", data.UserID)
+		gs.logConditionResult(ctx, chatMode, data, false)
 		return nil
 	}
-	log.Infow(ctx, "When condition evaluated to true, proceeding with processing",
-		"chat_mode", chatMode.Name,
-		"sender_role", data.SenderRole)
+	gs.logConditionResult(ctx, chatMode, data, true)
 
 	prompt, err := gs.buildPrompt(chatMode.PromptTemplate, data)
 	if err != nil {
@@ -159,67 +161,77 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 
 	log.Infow(ctx, "Processing message", "chat_mode", chatMode.Name, "session_id", data.SessionID)
 
-	// Create session context for this request and set it as current session
 	session, err := gs.createSessionContext(data)
 	if err != nil {
 		return fmt.Errorf("failed to create session context: %w", err)
 	}
 	gs.currentSession = session
 
-	// Get available tools for this chat mode
 	availableTools := gs.getToolsForMode(chatMode.Tools)
+	messages := gs.buildInitialMessages(prompt, data, session)
 
-	// Build initial messages
+	if err := gs.runAgentLoop(ctx, chatMode, messages, availableTools, session); err != nil {
+		return err
+	}
+
+	log.Infow(ctx, "Agent processing complete", "session_id", data.SessionID)
+	return nil
+}
+
+func (gs *GenkitService) logConditionResult(ctx context.Context, chatMode *models.ChatMode, data *PromptData, shouldProcess bool) {
+	if shouldProcess {
+		log.Infow(ctx, "When condition evaluated to true, proceeding with processing",
+			"chat_mode", chatMode.Name,
+			"sender_role", data.SenderRole)
+	} else {
+		log.Infow(ctx, "When condition evaluated to false, stopping processing",
+			"chat_mode", chatMode.Name,
+			"sender_role", data.SenderRole,
+			"user_id", data.UserID)
+	}
+}
+
+func (gs *GenkitService) buildInitialMessages(prompt string, data *PromptData, session tools.SessionContext) []*ai.Message {
 	messages := []*ai.Message{
 		ai.NewSystemTextMessage(prompt),
 	}
 
-	// Add recent messages as conversation history
 	if data.RecentMessages != nil && len(data.RecentMessages.Messages) > 0 {
-		for _, msg := range data.RecentMessages.Messages {
-			// Determine the role based on sender ID
-			if msg.SenderID == data.UserID {
-				messages = append(messages, ai.NewUserTextMessage(msg.Message))
-			} else {
-				messages = append(messages, ai.NewModelTextMessage(msg.Message))
-			}
-		}
-
-		// Save the timestamp of the oldest message for pagination
-		oldestMessage := data.RecentMessages.Messages[len(data.RecentMessages.Messages)-1]
-		session.SaveNextMessageTimestamp(oldestMessage.CreatedAt.UnixMilli())
+		messages = gs.addRecentMessages(messages, data, session)
 	}
 
-	// Add the current message
 	messages = append(messages, ai.NewUserTextMessage(data.Message))
+	return messages
+}
 
-	// Agent loop: iterate until no more tools are called or max iterations reached
+func (gs *GenkitService) addRecentMessages(messages []*ai.Message, data *PromptData, session tools.SessionContext) []*ai.Message {
+	for _, msg := range data.RecentMessages.Messages {
+		if msg.SenderID == data.UserID {
+			messages = append(messages, ai.NewUserTextMessage(msg.Message))
+		} else {
+			messages = append(messages, ai.NewModelTextMessage(msg.Message))
+		}
+	}
+
+	oldestMessage := data.RecentMessages.Messages[len(data.RecentMessages.Messages)-1]
+	session.SaveNextMessageTimestamp(oldestMessage.CreatedAt.UnixMilli())
+	return messages
+}
+
+func (gs *GenkitService) runAgentLoop(ctx context.Context, chatMode *models.ChatMode, messages []*ai.Message, availableTools []ai.Tool, session tools.SessionContext) error {
 	for i := 0; i < chatMode.MaxIterations; i++ {
 		log.Infow(ctx, "Agent iteration", "current", i+1, "max", chatMode.MaxIterations)
 
-		// Convert tools to ToolRef
-		var toolRefs []ai.ToolRef
-		for _, tool := range availableTools {
-			toolRefs = append(toolRefs, tool)
-		}
-
-		// Generate response using real Genkit API
-		response, err := genkit.Generate(ctx, gs.genkit,
-			ai.WithMessages(messages...),
-			ai.WithModelName(chatMode.Model),
-			ai.WithTools(toolRefs...),
-		)
+		response, err := gs.generateResponse(ctx, chatMode, messages, availableTools)
 		if err != nil {
 			return fmt.Errorf("failed to generate response: %w", err)
 		}
 
-		// Add assistant response to conversation
 		if response.Text() != "" {
 			messages = append(messages, ai.NewModelTextMessage(response.Text()))
 			log.Infow(ctx, "AI generated text response", "response", response.Text())
 		}
 
-		// Check if there are tool requests in the response
 		toolRequests := response.ToolRequests()
 		if len(toolRequests) == 0 {
 			log.Infow(ctx, "No tool requests found", "ai_response", response.Text())
@@ -229,56 +241,71 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 
 		log.Infow(ctx, "Processing tool requests", "count", len(toolRequests))
 
-		// Execute tools and add responses to conversation
-		var toolResponseParts []*ai.Part
-		for _, req := range toolRequests {
-			log.Infow(ctx, "Executing tool", "tool_name", req.Name)
-
-			// Find the tool by name
-			var tool ai.Tool
-			for _, t := range availableTools {
-				if t.Name() == req.Name {
-					tool = t
-					break
-				}
-			}
-
-			if tool == nil {
-				log.Errorw(ctx, "Tool not found", "tool_name", req.Name)
-				continue
-			}
-
-			// Execute the tool
-			output, err := tool.RunRaw(ctx, req.Input)
-			if err != nil {
-				log.Errorw(ctx, "Tool execution failed", "tool_name", req.Name, "error", err)
-				continue
-			}
-
-			log.Infow(ctx, "Tool executed successfully", "tool_name", req.Name)
-
-			// Add tool response to the conversation
-			toolResponseParts = append(toolResponseParts,
-				ai.NewToolResponsePart(&ai.ToolResponse{
-					Name:   req.Name,
-					Ref:    req.Ref,
-					Output: output,
-				}))
+		toolResponseParts, err := gs.executeToolRequests(ctx, toolRequests, availableTools)
+		if err != nil {
+			return err
 		}
 
-		// Add tool responses to the conversation
 		if len(toolResponseParts) > 0 {
 			messages = append(messages, ai.NewMessage(ai.RoleTool, nil, toolResponseParts...))
 		}
 
-		// Check if session has been ended by a tool
 		if session.IsEnded() {
 			log.Info(ctx, "Session has been terminated by tool execution, ending conversation")
 			break
 		}
 	}
+	return nil
+}
 
-	log.Infow(ctx, "Agent processing complete", "session_id", data.SessionID)
+func (gs *GenkitService) generateResponse(ctx context.Context, chatMode *models.ChatMode, messages []*ai.Message, availableTools []ai.Tool) (*ai.ModelResponse, error) {
+	var toolRefs []ai.ToolRef
+	for _, tool := range availableTools {
+		toolRefs = append(toolRefs, tool)
+	}
+
+	return genkit.Generate(ctx, gs.genkit,
+		ai.WithMessages(messages...),
+		ai.WithModelName(chatMode.Model),
+		ai.WithTools(toolRefs...),
+	)
+}
+
+func (gs *GenkitService) executeToolRequests(ctx context.Context, toolRequests []*ai.ToolRequest, availableTools []ai.Tool) ([]*ai.Part, error) {
+	var toolResponseParts []*ai.Part
+	for _, req := range toolRequests {
+		log.Infow(ctx, "Executing tool", "tool_name", req.Name)
+
+		tool := gs.findToolByName(req.Name, availableTools)
+		if tool == nil {
+			log.Errorw(ctx, "Tool not found", "tool_name", req.Name)
+			continue
+		}
+
+		output, err := tool.RunRaw(ctx, req.Input)
+		if err != nil {
+			log.Errorw(ctx, "Tool execution failed", "tool_name", req.Name, "error", err)
+			continue
+		}
+
+		log.Infow(ctx, "Tool executed successfully", "tool_name", req.Name)
+
+		toolResponseParts = append(toolResponseParts,
+			ai.NewToolResponsePart(&ai.ToolResponse{
+				Name:   req.Name,
+				Ref:    req.Ref,
+				Output: output,
+			}))
+	}
+	return toolResponseParts, nil
+}
+
+func (gs *GenkitService) findToolByName(name string, availableTools []ai.Tool) ai.Tool {
+	for _, tool := range availableTools {
+		if tool.Name() == name {
+			return tool
+		}
+	}
 	return nil
 }
 
