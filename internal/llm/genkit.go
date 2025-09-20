@@ -51,10 +51,10 @@ type PromptData struct {
 	Message     string
 }
 
-func (gs *GenkitService) defineTools(ctx context.Context, data *PromptData) error {
+func (gs *GenkitService) defineTools(ctx context.Context, data *PromptData) (SessionContext, error) {
 	sessionID, err := primitive.ObjectIDFromHex(data.SessionID)
 	if err != nil {
-		return fmt.Errorf("invalid session ID: %w", err)
+		return nil, fmt.Errorf("invalid session ID: %w", err)
 	}
 
 	channelID := getChannelID(data)
@@ -67,12 +67,13 @@ func (gs *GenkitService) defineTools(ctx context.Context, data *PromptData) erro
 	}
 
 	// Create session context for tool operations
-	session := &SessionContext{
-		SessionID: sessionID,
-		ChannelID: channelID,
-		UserID:    userID,
-		SenderID:  otherUserID,
-	}
+	session := NewSessionContext(SessionContextConfig{
+		SessionID:   sessionID,
+		ChannelID:   channelID,
+		UserID:      userID,
+		SenderID:    otherUserID,
+		SessionRepo: gs.toolsManager.sessionRepo,
+	})
 
 	// Define TriggerBuy tool
 	triggerBuyTool := genkit.DefineTool(gs.genkit, "TriggerBuy", "Logs purchase intent and notifies sellers when a user shows buying interest",
@@ -122,7 +123,7 @@ func (gs *GenkitService) defineTools(ctx context.Context, data *PromptData) erro
 	// Store tools for later use
 	gs.tools = []ai.Tool{triggerBuyTool, replyMessageTool, fetchMessagesTool, endSessionTool}
 
-	return nil
+	return session, nil
 }
 
 func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.ChatMode, data *PromptData) error {
@@ -134,7 +135,8 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 	log.Printf("Processing with chat mode: %s", chatMode.Name)
 
 	// Define tools with context data for this request
-	if err := gs.defineTools(ctx, data); err != nil {
+	session, err := gs.defineTools(ctx, data)
+	if err != nil {
 		return fmt.Errorf("failed to define tools: %w", err)
 	}
 
@@ -186,6 +188,12 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 
 		// Tool execution is handled automatically by Genkit when tools are properly defined
 		// The tool responses will be included in the next iteration automatically
+
+		// Check if session has been ended by a tool
+		if session.IsEnded() {
+			log.Printf("Session has been terminated by tool execution, ending conversation")
+			break
+		}
 	}
 
 	log.Printf("Agent processing complete for session %s", data.SessionID)

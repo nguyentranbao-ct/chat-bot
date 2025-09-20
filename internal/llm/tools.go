@@ -12,12 +12,27 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// SessionContext contains all the context information needed for tool execution
-type SessionContext struct {
-	SessionID primitive.ObjectID
-	ChannelID string
-	UserID    string
-	SenderID  string
+// SessionContext interface defines methods that tools can call during execution
+type SessionContext interface {
+	// Getters for session information
+	GetSessionID() primitive.ObjectID
+	GetChannelID() string
+	GetUserID() string
+	GetSenderID() string
+
+	// Session control methods
+	EndSession() error
+	IsEnded() bool
+}
+
+// sessionContext is the concrete implementation of SessionContext
+type sessionContext struct {
+	sessionID primitive.ObjectID
+	channelID string
+	userID    string
+	senderID  string
+	ended     bool
+	sessionRepo repository.ChatSessionRepository
 }
 
 type ToolsManager struct {
@@ -41,6 +56,63 @@ func NewToolsManager(
 	}
 }
 
+// SessionContextConfig holds configuration for creating a SessionContext
+type SessionContextConfig struct {
+	SessionID   primitive.ObjectID
+	ChannelID   string
+	UserID      string
+	SenderID    string
+	SessionRepo repository.ChatSessionRepository
+}
+
+// NewSessionContext creates a new SessionContext instance
+func NewSessionContext(config SessionContextConfig) SessionContext {
+	return &sessionContext{
+		sessionID:   config.SessionID,
+		channelID:   config.ChannelID,
+		userID:      config.UserID,
+		senderID:    config.SenderID,
+		ended:       false,
+		sessionRepo: config.SessionRepo,
+	}
+}
+
+// Getter methods
+func (s *sessionContext) GetSessionID() primitive.ObjectID {
+	return s.sessionID
+}
+
+func (s *sessionContext) GetChannelID() string {
+	return s.channelID
+}
+
+func (s *sessionContext) GetUserID() string {
+	return s.userID
+}
+
+func (s *sessionContext) GetSenderID() string {
+	return s.senderID
+}
+
+// Session control methods
+func (s *sessionContext) EndSession() error {
+	if s.ended {
+		return nil // Already ended
+	}
+
+	if err := s.sessionRepo.EndSession(context.Background(), s.sessionID); err != nil {
+		return fmt.Errorf("failed to end session: %w", err)
+	}
+
+	s.ended = true
+	log.Printf("Session %s ended successfully", s.sessionID.Hex())
+	return nil
+}
+
+func (s *sessionContext) IsEnded() bool {
+	return s.ended
+}
+
 type TriggerBuyArgs struct {
 	ItemName  string `json:"item_name"`
 	ItemPrice string `json:"item_price"`
@@ -58,11 +130,11 @@ type FetchMessagesArgs struct {
 
 type EndSessionArgs struct{}
 
-func (tm *ToolsManager) triggerBuy(ctx context.Context, args TriggerBuyArgs, session *SessionContext) error {
+func (tm *ToolsManager) triggerBuy(ctx context.Context, args TriggerBuyArgs, session SessionContext) error {
 	intent := &models.PurchaseIntent{
-		SessionID: session.SessionID,
-		ChannelID: session.ChannelID,
-		UserID:    session.UserID,
+		SessionID: session.GetSessionID(),
+		ChannelID: session.GetChannelID(),
+		UserID:    session.GetUserID(),
 		ItemName:  args.ItemName,
 		ItemPrice: args.ItemPrice,
 		Intent:    args.Intent,
@@ -75,8 +147,8 @@ func (tm *ToolsManager) triggerBuy(ctx context.Context, args TriggerBuyArgs, ses
 	// Send message to channel if provided
 	if args.Message != "" {
 		message := &models.OutgoingMessage{
-			ChannelID: session.ChannelID,
-			SenderID:  session.SenderID,
+			ChannelID: session.GetChannelID(),
+			SenderID:  session.GetSenderID(),
 			Message:   args.Message,
 		}
 
@@ -84,13 +156,13 @@ func (tm *ToolsManager) triggerBuy(ctx context.Context, args TriggerBuyArgs, ses
 			log.Printf("Failed to send message after TriggerBuy: %v", err)
 			// Don't return error, just log it - we still want to log the activity
 		} else {
-			log.Printf("Message sent to channel %s after TriggerBuy", session.ChannelID)
+			log.Printf("Message sent to channel %s after TriggerBuy", session.GetChannelID())
 		}
 	}
 
 	activity := &models.ChatActivity{
-		SessionID: session.SessionID,
-		ChannelID: session.ChannelID,
+		SessionID: session.GetSessionID(),
+		ChannelID: session.GetChannelID(),
 		Action:    models.ActivityTriggerBuy,
 		Data:      args,
 	}
@@ -99,14 +171,14 @@ func (tm *ToolsManager) triggerBuy(ctx context.Context, args TriggerBuyArgs, ses
 		log.Printf("Failed to log TriggerBuy activity: %v", err)
 	}
 
-	log.Printf("Purchase intent logged: %s wants to buy %s for %s", session.UserID, args.ItemName, args.ItemPrice)
+	log.Printf("Purchase intent logged: %s wants to buy %s for %s", session.GetUserID(), args.ItemName, args.ItemPrice)
 	return nil
 }
 
-func (tm *ToolsManager) replyMessage(ctx context.Context, args ReplyMessageArgs, session *SessionContext) error {
+func (tm *ToolsManager) replyMessage(ctx context.Context, args ReplyMessageArgs, session SessionContext) error {
 	message := &models.OutgoingMessage{
-		ChannelID: session.ChannelID,
-		SenderID:  session.SenderID,
+		ChannelID: session.GetChannelID(),
+		SenderID:  session.GetSenderID(),
 		Message:   args.Message,
 	}
 
@@ -115,8 +187,8 @@ func (tm *ToolsManager) replyMessage(ctx context.Context, args ReplyMessageArgs,
 	}
 
 	activity := &models.ChatActivity{
-		SessionID: session.SessionID,
-		ChannelID: session.ChannelID,
+		SessionID: session.GetSessionID(),
+		ChannelID: session.GetChannelID(),
 		Action:    models.ActivityReplyMessage,
 		Data:      args,
 	}
@@ -125,23 +197,23 @@ func (tm *ToolsManager) replyMessage(ctx context.Context, args ReplyMessageArgs,
 		log.Printf("Failed to log ReplyMessage activity: %v", err)
 	}
 
-	log.Printf("Message sent to channel %s", session.ChannelID)
+	log.Printf("Message sent to channel %s", session.GetChannelID())
 	return nil
 }
 
-func (tm *ToolsManager) fetchMessages(ctx context.Context, args FetchMessagesArgs, session *SessionContext) (*models.MessageHistory, error) {
+func (tm *ToolsManager) fetchMessages(ctx context.Context, args FetchMessagesArgs, session SessionContext) (*models.MessageHistory, error) {
 	if args.Limit == 0 {
 		args.Limit = 100
 	}
 
-	history, err := tm.chatAPIClient.GetMessageHistory(ctx, session.UserID, session.ChannelID, args.Limit)
+	history, err := tm.chatAPIClient.GetMessageHistory(ctx, session.GetUserID(), session.GetChannelID(), args.Limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch messages: %w", err)
 	}
 
 	activity := &models.ChatActivity{
-		SessionID: session.SessionID,
-		ChannelID: session.ChannelID,
+		SessionID: session.GetSessionID(),
+		ChannelID: session.GetChannelID(),
 		Action:    models.ActivityFetchMessages,
 		Data:      args,
 	}
@@ -150,18 +222,19 @@ func (tm *ToolsManager) fetchMessages(ctx context.Context, args FetchMessagesArg
 		log.Printf("Failed to log FetchMessages activity: %v", err)
 	}
 
-	log.Printf("Fetched %d messages from channel %s", len(history.Messages), session.ChannelID)
+	log.Printf("Fetched %d messages from channel %s", len(history.Messages), session.GetChannelID())
 	return history, nil
 }
 
-func (tm *ToolsManager) endSession(ctx context.Context, args EndSessionArgs, session *SessionContext) error {
-	if err := tm.sessionRepo.EndSession(ctx, session.SessionID); err != nil {
+func (tm *ToolsManager) endSession(ctx context.Context, args EndSessionArgs, session SessionContext) error {
+	// Use the SessionContext's EndSession method
+	if err := session.EndSession(); err != nil {
 		return fmt.Errorf("failed to end session: %w", err)
 	}
 
 	activity := &models.ChatActivity{
-		SessionID: session.SessionID,
-		ChannelID: session.ChannelID,
+		SessionID: session.GetSessionID(),
+		ChannelID: session.GetChannelID(),
 		Action:    models.ActivityEndSession,
 		Data:      args,
 	}
@@ -170,7 +243,6 @@ func (tm *ToolsManager) endSession(ctx context.Context, args EndSessionArgs, ses
 		log.Printf("Failed to log EndSession activity: %v", err)
 	}
 
-	log.Printf("Session %s ended successfully", session.SessionID.Hex())
 	return nil
 }
 
@@ -185,7 +257,7 @@ type ToolResult struct {
 	Error   string      `json:"error,omitempty"`
 }
 
-func (tm *ToolsManager) ExecuteTool(ctx context.Context, toolCall ToolCall, session *SessionContext) (*ToolResult, error) {
+func (tm *ToolsManager) ExecuteTool(ctx context.Context, toolCall ToolCall, session SessionContext) (*ToolResult, error) {
 	switch toolCall.Name {
 	case "TriggerBuy":
 		var args TriggerBuyArgs
