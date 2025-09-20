@@ -11,7 +11,7 @@ import (
 	log "github.com/carousell/ct-go/pkg/logger/log_context"
 	"github.com/carousell/ct-go/pkg/workerpool"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 	"github.com/nguyentranbao-ct/chat-bot/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/segmentio/kafka-go"
@@ -19,6 +19,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+type Consumer interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+}
 
 type kafkaConsumer struct {
 	reader         *kafka.Reader
@@ -190,6 +195,14 @@ func (c *kafkaConsumer) handle(msgCtx context.Context, msg kafka.Message) (durat
 	// Only process message.sent events
 	if kafkaMessage.Pattern != "message.sent" {
 		log.Infow(msgCtx, "Ignoring non-message.sent event", "pattern", kafkaMessage.Pattern)
+		return 0, nil
+	}
+
+	// Skip messages from the bot itself to prevent infinite loops
+	if kafkaMessage.Data.SenderID == "chat-bot" {
+		log.Infow(msgCtx, "Skipping message from bot itself to prevent loops",
+			"sender_id", kafkaMessage.Data.SenderID,
+			"channel_id", kafkaMessage.Data.ChannelID)
 		return 0, nil
 	}
 

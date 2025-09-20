@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	log "github.com/carousell/ct-go/pkg/logger/log_context"
-	"github.com/nguyentranbao-ct/chat-bot/internal/client"
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repository"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 )
 
 type FetchMessagesArgs struct {
@@ -16,13 +16,13 @@ type FetchMessagesArgs struct {
 }
 
 type FetchMessagesTool struct {
-	chatAPIClient client.ChatAPIClient
-	activityRepo  repository.ChatActivityRepository
+	chatAPIClient chatapi.Client
+	activityRepo  mongodb.ChatActivityRepository
 }
 
 func NewFetchMessagesTool(
-	chatAPIClient client.ChatAPIClient,
-	activityRepo repository.ChatActivityRepository,
+	chatAPIClient chatapi.Client,
+	activityRepo mongodb.ChatActivityRepository,
 ) *FetchMessagesTool {
 	return &FetchMessagesTool{
 		chatAPIClient: chatAPIClient,
@@ -38,7 +38,7 @@ func (t *FetchMessagesTool) Execute(ctx context.Context, args FetchMessagesArgs,
 		beforeTs = session.GetNextMessageTimestamp()
 	}
 
-	req := client.MessageHistoryRequest{
+	req := chatapi.MessageHistoryRequest{
 		UserID:    session.GetUserID(),
 		ChannelID: session.GetChannelID(),
 		Limit:     args.Limit,

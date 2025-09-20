@@ -8,14 +8,12 @@ import (
 
 	"github.com/carousell/ct-go/pkg/logger"
 	"github.com/labstack/echo/v4"
-	"github.com/nguyentranbao-ct/chat-bot/internal/client"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
-	"github.com/nguyentranbao-ct/chat-bot/internal/handler"
 	"github.com/nguyentranbao-ct/chat-bot/internal/kafka"
-	"github.com/nguyentranbao-ct/chat-bot/internal/llm"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repository"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repository/mongodb"
-	"github.com/nguyentranbao-ct/chat-bot/internal/service"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/llm"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
+	"github.com/nguyentranbao-ct/chat-bot/internal/server"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -41,7 +39,7 @@ func NewApp() *fx.App {
 			NewKafkaConfig,
 			NewMongoDB,
 			NewRepositories,
-			client.NewChatAPIClient,
+			chatapi.NewChatAPIClient,
 			NewToolsManager,
 			NewGenkitService,
 			NewMessageUsecase,
@@ -57,10 +55,10 @@ func NewApp() *fx.App {
 }
 
 type Repositories struct {
-	ChatMode       repository.ChatModeRepository
-	Session        repository.ChatSessionRepository
-	Activity       repository.ChatActivityRepository
-	PurchaseIntent repository.PurchaseIntentRepository
+	ChatMode       mongodb.ChatModeRepository
+	Session        mongodb.ChatSessionRepository
+	Activity       mongodb.ChatActivityRepository
+	PurchaseIntent mongodb.PurchaseIntentRepository
 }
 
 func NewKafkaConfig(cfg *config.Config) *config.KafkaConfig {
@@ -116,7 +114,7 @@ func NewRepositories(db *mongodb.DB) *Repositories {
 }
 
 func NewToolsManager(
-	chatAPIClient client.ChatAPIClient,
+	chatAPIClient chatapi.Client,
 	repos *Repositories,
 ) *llm.ToolsManager {
 	return llm.NewToolsManager(
@@ -127,15 +125,15 @@ func NewToolsManager(
 	)
 }
 
-func NewGenkitService(cfg *config.Config, toolsManager *llm.ToolsManager) (*llm.GenkitService, error) {
+func NewGenkitService(cfg *config.Config, toolsManager *llm.ToolsManager) (llm.Service, error) {
 	return llm.NewGenkitService(cfg, toolsManager)
 }
 
 func NewMessageUsecase(
 	repos *Repositories,
-	chatAPIClient client.ChatAPIClient,
-	genkitService *llm.GenkitService,
-	whitelistService service.WhitelistService,
+	chatAPIClient chatapi.Client,
+	genkitService llm.Service,
+	whitelistService usecase.WhitelistService,
 ) usecase.MessageUsecase {
 	return usecase.NewMessageUsecase(
 		repos.ChatMode,
@@ -147,23 +145,23 @@ func NewMessageUsecase(
 	)
 }
 
-func NewMessageHandler(messageUsecase usecase.MessageUsecase) *handler.MessageHandler {
-	return handler.NewMessageHandler(messageUsecase)
+func NewMessageHandler(messageUsecase usecase.MessageUsecase) server.Handler {
+	return server.NewHandler(messageUsecase)
 }
 
-func NewEchoServer(messageHandler *handler.MessageHandler) *echo.Echo {
+func NewEchoServer(messageHandler server.Handler) *echo.Echo {
 	e := echo.New()
-	handler.SetupMiddleware(e)
-	handler.SetupRoutes(e, messageHandler)
+	server.SetupMiddleware(e)
+	server.SetupRoutes(e, messageHandler)
 	return e
 }
 
-func NewWhitelistService(cfg *config.Config) service.WhitelistService {
-	return service.NewWhitelistService(&cfg.Kafka)
+func NewWhitelistService(cfg *config.Config) usecase.WhitelistService {
+	return usecase.NewWhitelistService(&cfg.Kafka)
 }
 
-func NewChatModeInitializer(repos *Repositories) service.ChatModeInitializer {
-	return service.NewChatModeInitializer(repos.ChatMode)
+func NewChatModeInitializer(repos *Repositories) usecase.ChatModeInitializer {
+	return usecase.NewChatModeInitializer(repos.ChatMode)
 }
 
 func NewKafkaMessageHandler(messageUsecase usecase.MessageUsecase) kafka.MessageHandler {
@@ -203,7 +201,7 @@ func StartKafkaConsumer(lc fx.Lifecycle, consumer kafka.Consumer) {
 	})
 }
 
-func InitializeDefaultChatModes(lc fx.Lifecycle, initializer service.ChatModeInitializer) {
+func InitializeDefaultChatModes(lc fx.Lifecycle, initializer usecase.ChatModeInitializer) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			if err := initializer.InitializeDefaultChatModes(ctx); err != nil {

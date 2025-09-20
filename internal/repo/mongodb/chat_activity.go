@@ -5,24 +5,30 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type ChatActivityRepo struct {
+type ChatActivityRepository interface {
+	Create(ctx context.Context, activity *models.ChatActivity) error
+	GetBySessionID(ctx context.Context, sessionID primitive.ObjectID) ([]*models.ChatActivity, error)
+	GetByChannelID(ctx context.Context, channelID string, limit int) ([]*models.ChatActivity, error)
+}
+
+type chatActivityRepo struct {
 	collection *mongo.Collection
 }
 
-func NewChatActivityRepository(db *DB) *ChatActivityRepo {
-	return &ChatActivityRepo{
+func NewChatActivityRepository(db *DB) ChatActivityRepository {
+	return &chatActivityRepo{
 		collection: db.Database.Collection("chat_activities"),
 	}
 }
 
-func (r *ChatActivityRepo) Create(ctx context.Context, activity *models.ChatActivity) error {
+func (r *chatActivityRepo) Create(ctx context.Context, activity *models.ChatActivity) error {
 	activity.ID = primitive.NewObjectID()
 	activity.ExecutedAt = time.Now()
 	activity.CreatedAt = time.Now()
@@ -34,7 +40,7 @@ func (r *ChatActivityRepo) Create(ctx context.Context, activity *models.ChatActi
 	return nil
 }
 
-func (r *ChatActivityRepo) GetBySessionID(ctx context.Context, sessionID primitive.ObjectID) ([]*models.ChatActivity, error) {
+func (r *chatActivityRepo) GetBySessionID(ctx context.Context, sessionID primitive.ObjectID) ([]*models.ChatActivity, error) {
 	filter := bson.M{"session_id": sessionID}
 	opts := options.Find().SetSort(bson.D{{Key: "executed_at", Value: 1}})
 
@@ -60,7 +66,7 @@ func (r *ChatActivityRepo) GetBySessionID(ctx context.Context, sessionID primiti
 	return activities, nil
 }
 
-func (r *ChatActivityRepo) GetByChannelID(ctx context.Context, channelID string, limit int) ([]*models.ChatActivity, error) {
+func (r *chatActivityRepo) GetByChannelID(ctx context.Context, channelID string, limit int) ([]*models.ChatActivity, error) {
 	filter := bson.M{"channel_id": channelID}
 	opts := options.Find().
 		SetSort(bson.D{{Key: "executed_at", Value: -1}}).

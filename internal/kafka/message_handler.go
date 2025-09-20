@@ -3,9 +3,13 @@ package kafka
 import (
 	"context"
 
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 )
+
+type MessageHandler interface {
+	HandleMessage(ctx context.Context, message *models.IncomingMessage) error
+}
 
 // messageHandler adapts the usecase to implement the Kafka MessageHandler interface
 type messageHandler struct {

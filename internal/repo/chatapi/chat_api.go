@@ -1,4 +1,4 @@
-package client
+package chatapi
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/carousell/chat-api/pkg/client"
 	"github.com/carousell/ct-go/pkg/logger/log"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 )
 
 type MessageHistoryRequest struct {
@@ -19,7 +19,7 @@ type MessageHistoryRequest struct {
 	BeforeTs  *int64
 }
 
-type ChatAPIClient interface {
+type Client interface {
 	GetChannelInfo(ctx context.Context, channelID string) (*models.ChannelInfo, error)
 	GetMessageHistory(ctx context.Context, userID, channelID string, limit int) (*models.MessageHistory, error)
 	GetMessageHistoryWithParams(ctx context.Context, req MessageHistoryRequest) (*models.MessageHistory, error)
@@ -31,7 +31,7 @@ type chatAPIClient struct {
 	projectID string
 }
 
-func NewChatAPIClient(conf *config.Config) ChatAPIClient {
+func NewChatAPIClient(conf *config.Config) Client {
 	cfg := conf.ChatAPI
 	log.Info("Creating chat-api client", log.Reflect("config", cfg))
 	config := client.Config{

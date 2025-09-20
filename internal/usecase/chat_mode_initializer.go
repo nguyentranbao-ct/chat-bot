@@ -1,4 +1,4 @@
-package service
+package usecase
 
 import (
 	"context"
@@ -6,19 +6,23 @@ import (
 	"fmt"
 
 	"github.com/carousell/ct-go/pkg/logger"
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repository"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 	"gopkg.in/yaml.v3"
 )
 
 //go:embed default_chat_modes.yaml
 var defaultChatModesData []byte
 
-type chatModeInitializer struct {
-	repo repository.ChatModeRepository
+type ChatModeInitializer interface {
+	InitializeDefaultChatModes(ctx context.Context) error
 }
 
-func NewChatModeInitializer(repo repository.ChatModeRepository) ChatModeInitializer {
+type chatModeInitializer struct {
+	repo mongodb.ChatModeRepository
+}
+
+func NewChatModeInitializer(repo mongodb.ChatModeRepository) ChatModeInitializer {
 	return &chatModeInitializer{
 		repo: repo,
 	}

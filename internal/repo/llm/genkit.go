@@ -13,12 +13,16 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
-	"github.com/nguyentranbao-ct/chat-bot/internal/llm/tools"
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/llm/tools"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type GenkitService struct {
+type Service interface {
+	ProcessMessage(ctx context.Context, chatMode *models.ChatMode, data *PromptData) error
+}
+
+type genkitService struct {
 	genkit         *genkit.Genkit
 	toolsManager   *ToolsManager
 	config         *config.Config
@@ -26,7 +30,7 @@ type GenkitService struct {
 	currentSession tools.SessionContext
 }
 
-func NewGenkitService(cfg *config.Config, toolsManager *ToolsManager) (*GenkitService, error) {
+func NewGenkitService(cfg *config.Config, toolsManager *ToolsManager) (Service, error) {
 	ctx := context.Background()
 
 	// Initialize Google AI plugin
@@ -38,7 +42,7 @@ func NewGenkitService(cfg *config.Config, toolsManager *ToolsManager) (*GenkitSe
 	g := genkit.Init(ctx, genkit.WithPlugins(googleAI))
 
 	// Create Genkit service instance
-	gs := &GenkitService{
+	gs := &genkitService{
 		genkit:       g,
 		toolsManager: toolsManager,
 		config:       cfg,
@@ -61,7 +65,7 @@ type PromptData struct {
 	RecentMessages *models.MessageHistory
 }
 
-func (gs *GenkitService) initializeTools(ctx context.Context) error {
+func (gs *genkitService) initializeTools(ctx context.Context) error {
 	triggerBuyTool := gs.createTriggerBuyTool(ctx)
 	replyMessageTool := gs.createReplyMessageTool(ctx)
 	fetchMessagesTool := gs.createFetchMessagesTool(ctx)
@@ -71,7 +75,7 @@ func (gs *GenkitService) initializeTools(ctx context.Context) error {
 	return nil
 }
 
-func (gs *GenkitService) createTriggerBuyTool(ctx context.Context) ai.Tool {
+func (gs *genkitService) createTriggerBuyTool(ctx context.Context) ai.Tool {
 	return genkit.DefineTool(gs.genkit, "TriggerBuy", "Logs purchase intent when a user shows buying interest",
 		func(toolCtx *ai.ToolContext, input TriggerBuyArgs) (string, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -83,7 +87,7 @@ func (gs *GenkitService) createTriggerBuyTool(ctx context.Context) ai.Tool {
 		})
 }
 
-func (gs *GenkitService) createReplyMessageTool(ctx context.Context) ai.Tool {
+func (gs *genkitService) createReplyMessageTool(ctx context.Context) ai.Tool {
 	return genkit.DefineTool(gs.genkit, "ReplyMessage", "Send a message to the chat channel via chat-api",
 		func(toolCtx *ai.ToolContext, input ReplyMessageArgs) (string, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -95,7 +99,7 @@ func (gs *GenkitService) createReplyMessageTool(ctx context.Context) ai.Tool {
 		})
 }
 
-func (gs *GenkitService) createFetchMessagesTool(ctx context.Context) ai.Tool {
+func (gs *genkitService) createFetchMessagesTool(ctx context.Context) ai.Tool {
 	return genkit.DefineTool(gs.genkit, "FetchMessages", "Fetch additional conversation history from the channel",
 		func(toolCtx *ai.ToolContext, input FetchMessagesArgs) (*models.MessageHistory, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -104,7 +108,7 @@ func (gs *GenkitService) createFetchMessagesTool(ctx context.Context) ai.Tool {
 		})
 }
 
-func (gs *GenkitService) createEndSessionTool(ctx context.Context) ai.Tool {
+func (gs *genkitService) createEndSessionTool(ctx context.Context) ai.Tool {
 	return genkit.DefineTool(gs.genkit, "EndSession", "Terminate the current AI conversation session",
 		func(toolCtx *ai.ToolContext, input EndSessionArgs) (string, error) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -116,7 +120,7 @@ func (gs *GenkitService) createEndSessionTool(ctx context.Context) ai.Tool {
 		})
 }
 
-func (gs *GenkitService) createSessionContext(data *PromptData) (tools.SessionContext, error) {
+func (gs *genkitService) createSessionContext(data *PromptData) (tools.SessionContext, error) {
 	sessionID, err := primitive.ObjectIDFromHex(data.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid session ID: %w", err)
@@ -143,7 +147,7 @@ func (gs *GenkitService) createSessionContext(data *PromptData) (tools.SessionCo
 	return session, nil
 }
 
-func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.ChatMode, data *PromptData) error {
+func (gs *genkitService) ProcessMessage(ctx context.Context, chatMode *models.ChatMode, data *PromptData) error {
 	shouldProcess, err := gs.evaluateCondition(chatMode.Condition, data)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate when condition: %w", err)
@@ -178,7 +182,7 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 	return nil
 }
 
-func (gs *GenkitService) logConditionResult(ctx context.Context, chatMode *models.ChatMode, data *PromptData, shouldProcess bool) {
+func (gs *genkitService) logConditionResult(ctx context.Context, chatMode *models.ChatMode, data *PromptData, shouldProcess bool) {
 	if shouldProcess {
 		log.Infow(ctx, "When condition evaluated to true, proceeding with processing",
 			"chat_mode", chatMode.Name,
@@ -191,7 +195,7 @@ func (gs *GenkitService) logConditionResult(ctx context.Context, chatMode *model
 	}
 }
 
-func (gs *GenkitService) buildInitialMessages(prompt string, data *PromptData, session tools.SessionContext) []*ai.Message {
+func (gs *genkitService) buildInitialMessages(prompt string, data *PromptData, session tools.SessionContext) []*ai.Message {
 	messages := []*ai.Message{
 		ai.NewSystemTextMessage(prompt),
 	}
@@ -204,7 +208,7 @@ func (gs *GenkitService) buildInitialMessages(prompt string, data *PromptData, s
 	return messages
 }
 
-func (gs *GenkitService) addRecentMessages(messages []*ai.Message, data *PromptData, session tools.SessionContext) []*ai.Message {
+func (gs *genkitService) addRecentMessages(messages []*ai.Message, data *PromptData, session tools.SessionContext) []*ai.Message {
 	for _, msg := range data.RecentMessages.Messages {
 		if msg.SenderID == data.UserID {
 			messages = append(messages, ai.NewUserTextMessage(msg.Message))
@@ -218,7 +222,7 @@ func (gs *GenkitService) addRecentMessages(messages []*ai.Message, data *PromptD
 	return messages
 }
 
-func (gs *GenkitService) runAgentLoop(ctx context.Context, chatMode *models.ChatMode, messages []*ai.Message, availableTools []ai.Tool, session tools.SessionContext) error {
+func (gs *genkitService) runAgentLoop(ctx context.Context, chatMode *models.ChatMode, messages []*ai.Message, availableTools []ai.Tool, session tools.SessionContext) error {
 	for i := 0; i < chatMode.MaxIterations; i++ {
 		log.Infow(ctx, "Agent iteration", "current", i+1, "max", chatMode.MaxIterations)
 
@@ -234,8 +238,7 @@ func (gs *GenkitService) runAgentLoop(ctx context.Context, chatMode *models.Chat
 
 		toolRequests := response.ToolRequests()
 		if len(toolRequests) == 0 {
-			log.Infow(ctx, "No tool requests found", "ai_response", response.Text())
-			log.Info(ctx, "Ending conversation - AI did not use any tools")
+			log.Infow(ctx, "Ending conversation - AI did not use any tools", "ai_response", response.Text())
 			break
 		}
 
@@ -258,7 +261,7 @@ func (gs *GenkitService) runAgentLoop(ctx context.Context, chatMode *models.Chat
 	return nil
 }
 
-func (gs *GenkitService) generateResponse(ctx context.Context, chatMode *models.ChatMode, messages []*ai.Message, availableTools []ai.Tool) (*ai.ModelResponse, error) {
+func (gs *genkitService) generateResponse(ctx context.Context, chatMode *models.ChatMode, messages []*ai.Message, availableTools []ai.Tool) (*ai.ModelResponse, error) {
 	var toolRefs []ai.ToolRef
 	for _, tool := range availableTools {
 		toolRefs = append(toolRefs, tool)
@@ -271,7 +274,7 @@ func (gs *GenkitService) generateResponse(ctx context.Context, chatMode *models.
 	)
 }
 
-func (gs *GenkitService) executeToolRequests(ctx context.Context, toolRequests []*ai.ToolRequest, availableTools []ai.Tool) ([]*ai.Part, error) {
+func (gs *genkitService) executeToolRequests(ctx context.Context, toolRequests []*ai.ToolRequest, availableTools []ai.Tool) ([]*ai.Part, error) {
 	var toolResponseParts []*ai.Part
 	for _, req := range toolRequests {
 		log.Infow(ctx, "Executing tool", "tool_name", req.Name)
@@ -300,7 +303,7 @@ func (gs *GenkitService) executeToolRequests(ctx context.Context, toolRequests [
 	return toolResponseParts, nil
 }
 
-func (gs *GenkitService) findToolByName(name string, availableTools []ai.Tool) ai.Tool {
+func (gs *genkitService) findToolByName(name string, availableTools []ai.Tool) ai.Tool {
 	for _, tool := range availableTools {
 		if tool.Name() == name {
 			return tool
@@ -309,7 +312,7 @@ func (gs *GenkitService) findToolByName(name string, availableTools []ai.Tool) a
 	return nil
 }
 
-func (gs *GenkitService) buildPrompt(templateStr string, data *PromptData) (string, error) {
+func (gs *genkitService) buildPrompt(templateStr string, data *PromptData) (string, error) {
 	tmpl, err := template.New("prompt").Parse(templateStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
@@ -323,7 +326,7 @@ func (gs *GenkitService) buildPrompt(templateStr string, data *PromptData) (stri
 	return buf.String(), nil
 }
 
-func (gs *GenkitService) evaluateCondition(whenTemplate string, data *PromptData) (bool, error) {
+func (gs *genkitService) evaluateCondition(whenTemplate string, data *PromptData) (bool, error) {
 	tmpl, err := template.New("when").Parse(whenTemplate)
 	if err != nil {
 		return false, fmt.Errorf("failed to parse when template: %w", err)
@@ -338,7 +341,7 @@ func (gs *GenkitService) evaluateCondition(whenTemplate string, data *PromptData
 	return result == "true", nil
 }
 
-func (gs *GenkitService) getToolsForMode(toolNames []string) []ai.Tool {
+func (gs *genkitService) getToolsForMode(toolNames []string) []ai.Tool {
 	var availableTools []ai.Tool
 	for _, toolName := range toolNames {
 		for _, tool := range gs.tools {

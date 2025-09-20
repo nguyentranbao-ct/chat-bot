@@ -44,7 +44,7 @@ type KafkaConfig struct {
 	Brokers   []string `env:"BROKERS" envDefault:"kafka-08.ct.dev:9092"`
 	Topic     string   `env:"TOPIC" envDefault:"chat.event.messages"`
 	GroupID   string   `env:"GROUP_ID" envDefault:"chat-bot-consumers"`
-	Whitelist []string `env:"SELLER_WHITELIST" envDefault:"11198316"`
+	Whitelist []string `env:"SELLER_WHITELIST" envDefault:"11198316,11356173"`
 }
 
 func Load() (*Config, error) {

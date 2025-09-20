@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	log "github.com/carousell/ct-go/pkg/logger/log_context"
-	"github.com/nguyentranbao-ct/chat-bot/internal/client"
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repository"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 )
 
 type ReplyMessageArgs struct {
@@ -15,13 +15,13 @@ type ReplyMessageArgs struct {
 }
 
 type ReplyMessageTool struct {
-	chatAPIClient client.ChatAPIClient
-	activityRepo  repository.ChatActivityRepository
+	chatAPIClient chatapi.Client
+	activityRepo  mongodb.ChatActivityRepository
 }
 
 func NewReplyMessageTool(
-	chatAPIClient client.ChatAPIClient,
-	activityRepo repository.ChatActivityRepository,
+	chatAPIClient chatapi.Client,
+	activityRepo mongodb.ChatActivityRepository,
 ) *ReplyMessageTool {
 	return &ReplyMessageTool{
 		chatAPIClient: chatAPIClient,

@@ -4,18 +4,18 @@ import (
 	"context"
 
 	log "github.com/carousell/ct-go/pkg/logger/log_context"
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repository"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 )
 
 type EndSessionArgs struct{}
 
 type EndSessionTool struct {
-	activityRepo repository.ChatActivityRepository
+	activityRepo mongodb.ChatActivityRepository
 }
 
 func NewEndSessionTool(
-	activityRepo repository.ChatActivityRepository,
+	activityRepo mongodb.ChatActivityRepository,
 ) *EndSessionTool {
 	return &EndSessionTool{
 		activityRepo: activityRepo,

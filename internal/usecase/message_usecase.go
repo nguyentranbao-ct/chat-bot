@@ -6,29 +6,32 @@ import (
 	"time"
 
 	log "github.com/carousell/ct-go/pkg/logger/log_context"
-	"github.com/nguyentranbao-ct/chat-bot/internal/client"
-	"github.com/nguyentranbao-ct/chat-bot/internal/llm"
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repository"
-	"github.com/nguyentranbao-ct/chat-bot/internal/service"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/llm"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 )
 
+type MessageUsecase interface {
+	ProcessMessage(ctx context.Context, message *models.IncomingMessage) error
+}
+
 type messageUsecase struct {
-	chatModeRepo     repository.ChatModeRepository
-	sessionRepo      repository.ChatSessionRepository
-	activityRepo     repository.ChatActivityRepository
-	chatAPIClient    client.ChatAPIClient
-	genkitService    *llm.GenkitService
-	whitelistService service.WhitelistService
+	chatModeRepo     mongodb.ChatModeRepository
+	sessionRepo      mongodb.ChatSessionRepository
+	activityRepo     mongodb.ChatActivityRepository
+	chatAPIClient    chatapi.Client
+	genkitService    llm.Service
+	whitelistService WhitelistService
 }
 
 func NewMessageUsecase(
-	chatModeRepo repository.ChatModeRepository,
-	sessionRepo repository.ChatSessionRepository,
-	activityRepo repository.ChatActivityRepository,
-	chatAPIClient client.ChatAPIClient,
-	genkitService *llm.GenkitService,
-	whitelistService service.WhitelistService,
+	chatModeRepo mongodb.ChatModeRepository,
+	sessionRepo mongodb.ChatSessionRepository,
+	activityRepo mongodb.ChatActivityRepository,
+	chatAPIClient chatapi.Client,
+	genkitService llm.Service,
+	whitelistService WhitelistService,
 ) MessageUsecase {
 	return &messageUsecase{
 		chatModeRepo:     chatModeRepo,
@@ -69,7 +72,7 @@ func (uc *messageUsecase) ProcessMessage(ctx context.Context, message *models.In
 
 	session, err := uc.newSession(ctx, message, chatMode)
 	if err != nil {
-		return fmt.Errorf("failed to get or create session: %w", err)
+		return fmt.Errorf("failed to create session: %w", err)
 	}
 
 	// Find sender role from channel participants
@@ -145,8 +148,9 @@ func findSellerIDFromChannel(channelInfo *models.ChannelInfo) string {
 	return ""
 }
 
+
 func (uc *messageUsecase) fetchRecentMessages(ctx context.Context, userID, channelID string) (*models.MessageHistory, error) {
-	req := client.MessageHistoryRequest{
+	req := chatapi.MessageHistoryRequest{
 		UserID:    userID,
 		ChannelID: channelID,
 		Limit:     20,

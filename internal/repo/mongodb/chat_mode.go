@@ -5,24 +5,33 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type ChatModeRepo struct {
+type ChatModeRepository interface {
+	GetByName(ctx context.Context, name string) (*models.ChatMode, error)
+	Create(ctx context.Context, mode *models.ChatMode) error
+	Update(ctx context.Context, mode *models.ChatMode) error
+	Upsert(ctx context.Context, mode *models.ChatMode) error
+	Delete(ctx context.Context, id primitive.ObjectID) error
+	List(ctx context.Context) ([]*models.ChatMode, error)
+}
+
+type chatModeRepo struct {
 	collection *mongo.Collection
 }
 
-func NewChatModeRepository(db *DB) *ChatModeRepo {
-	return &ChatModeRepo{
+func NewChatModeRepository(db *DB) ChatModeRepository {
+	return &chatModeRepo{
 		collection: db.Database.Collection("chat_modes"),
 	}
 }
 
-func (r *ChatModeRepo) GetByName(ctx context.Context, name string) (*models.ChatMode, error) {
+func (r *chatModeRepo) GetByName(ctx context.Context, name string) (*models.ChatMode, error) {
 	var mode models.ChatMode
 	err := r.collection.FindOne(ctx, bson.M{"name": name}).Decode(&mode)
 	if err != nil {
@@ -34,7 +43,7 @@ func (r *ChatModeRepo) GetByName(ctx context.Context, name string) (*models.Chat
 	return &mode, nil
 }
 
-func (r *ChatModeRepo) Create(ctx context.Context, mode *models.ChatMode) error {
+func (r *chatModeRepo) Create(ctx context.Context, mode *models.ChatMode) error {
 	mode.ID = primitive.NewObjectID()
 	mode.CreatedAt = time.Now()
 	mode.UpdatedAt = time.Now()
@@ -46,7 +55,7 @@ func (r *ChatModeRepo) Create(ctx context.Context, mode *models.ChatMode) error 
 	return nil
 }
 
-func (r *ChatModeRepo) Update(ctx context.Context, mode *models.ChatMode) error {
+func (r *chatModeRepo) Update(ctx context.Context, mode *models.ChatMode) error {
 	mode.UpdatedAt = time.Now()
 
 	filter := bson.M{"_id": mode.ID}
@@ -59,7 +68,7 @@ func (r *ChatModeRepo) Update(ctx context.Context, mode *models.ChatMode) error 
 	return nil
 }
 
-func (r *ChatModeRepo) Upsert(ctx context.Context, mode *models.ChatMode) error {
+func (r *chatModeRepo) Upsert(ctx context.Context, mode *models.ChatMode) error {
 	now := time.Now()
 
 	filter := bson.M{"name": mode.Name}
@@ -87,7 +96,7 @@ func (r *ChatModeRepo) Upsert(ctx context.Context, mode *models.ChatMode) error 
 	return nil
 }
 
-func (r *ChatModeRepo) Delete(ctx context.Context, id primitive.ObjectID) error {
+func (r *chatModeRepo) Delete(ctx context.Context, id primitive.ObjectID) error {
 	_, err := r.collection.DeleteOne(ctx, bson.M{"_id": id})
 	if err != nil {
 		return fmt.Errorf("failed to delete chat mode: %w", err)
@@ -95,7 +104,7 @@ func (r *ChatModeRepo) Delete(ctx context.Context, id primitive.ObjectID) error 
 	return nil
 }
 
-func (r *ChatModeRepo) List(ctx context.Context) ([]*models.ChatMode, error) {
+func (r *chatModeRepo) List(ctx context.Context) ([]*models.ChatMode, error) {
 	cursor, err := r.collection.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list chat modes: %w", err)

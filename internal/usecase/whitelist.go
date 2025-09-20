@@ -1,10 +1,15 @@
-package service
+package usecase
 
 import (
 	"strings"
 
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
 )
+
+type WhitelistService interface {
+	IsSellerAllowed(sellerID string) bool
+	GetWhitelistedSellers() []string
+}
 
 type whitelistService struct {
 	allowedSellers map[string]bool

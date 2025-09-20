@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	log "github.com/carousell/ct-go/pkg/logger/log_context"
-	"github.com/nguyentranbao-ct/chat-bot/internal/client"
-	"github.com/nguyentranbao-ct/chat-bot/internal/llm/tools"
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repository"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/llm/tools"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -24,7 +24,7 @@ type sessionContext struct {
 	senderID             string
 	ended                bool
 	nextMessageTimestamp *int64
-	sessionRepo          repository.ChatSessionRepository
+	sessionRepo          mongodb.ChatSessionRepository
 }
 
 type ToolsManager struct {
@@ -32,14 +32,14 @@ type ToolsManager struct {
 	replyMessageTool *tools.ReplyMessageTool
 	fetchMessageTool *tools.FetchMessagesTool
 	endSessionTool   *tools.EndSessionTool
-	sessionRepo      repository.ChatSessionRepository
+	sessionRepo      mongodb.ChatSessionRepository
 }
 
 func NewToolsManager(
-	chatAPIClient client.ChatAPIClient,
-	sessionRepo repository.ChatSessionRepository,
-	activityRepo repository.ChatActivityRepository,
-	purchaseIntentRepo repository.PurchaseIntentRepository,
+	chatAPIClient chatapi.Client,
+	sessionRepo mongodb.ChatSessionRepository,
+	activityRepo mongodb.ChatActivityRepository,
+	purchaseIntentRepo mongodb.PurchaseIntentRepository,
 ) *ToolsManager {
 	return &ToolsManager{
 		triggerBuyTool:   tools.NewTriggerBuyTool(chatAPIClient, activityRepo, purchaseIntentRepo),
@@ -56,7 +56,7 @@ type SessionContextConfig struct {
 	ChannelID   string
 	UserID      string
 	SenderID    string
-	SessionRepo repository.ChatSessionRepository
+	SessionRepo mongodb.ChatSessionRepository
 }
 
 // NewSessionContext creates a new SessionContext instance

@@ -5,23 +5,32 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type ChatSessionRepo struct {
+type ChatSessionRepository interface {
+	Create(ctx context.Context, session *models.ChatSession) error
+	GetByChannelAndUser(ctx context.Context, channelID, userID string) (*models.ChatSession, error)
+	GetByID(ctx context.Context, id primitive.ObjectID) (*models.ChatSession, error)
+	Update(ctx context.Context, session *models.ChatSession) error
+	EndSession(ctx context.Context, id primitive.ObjectID) error
+	ListActiveSessions(ctx context.Context) ([]*models.ChatSession, error)
+}
+
+type chatSessionRepo struct {
 	collection *mongo.Collection
 }
 
-func NewChatSessionRepository(db *DB) *ChatSessionRepo {
-	return &ChatSessionRepo{
+func NewChatSessionRepository(db *DB) ChatSessionRepository {
+	return &chatSessionRepo{
 		collection: db.Database.Collection("chat_sessions"),
 	}
 }
 
-func (r *ChatSessionRepo) Create(ctx context.Context, session *models.ChatSession) error {
+func (r *chatSessionRepo) Create(ctx context.Context, session *models.ChatSession) error {
 	session.ID = primitive.NewObjectID()
 	session.CreatedAt = time.Now()
 	session.UpdatedAt = time.Now()
@@ -33,7 +42,7 @@ func (r *ChatSessionRepo) Create(ctx context.Context, session *models.ChatSessio
 	return nil
 }
 
-func (r *ChatSessionRepo) GetByChannelAndUser(ctx context.Context, channelID, userID string) (*models.ChatSession, error) {
+func (r *chatSessionRepo) GetByChannelAndUser(ctx context.Context, channelID, userID string) (*models.ChatSession, error) {
 	filter := bson.M{
 		"channel_id": channelID,
 		"user_id":    userID,
@@ -51,7 +60,7 @@ func (r *ChatSessionRepo) GetByChannelAndUser(ctx context.Context, channelID, us
 	return &session, nil
 }
 
-func (r *ChatSessionRepo) GetByID(ctx context.Context, id primitive.ObjectID) (*models.ChatSession, error) {
+func (r *chatSessionRepo) GetByID(ctx context.Context, id primitive.ObjectID) (*models.ChatSession, error) {
 	var session models.ChatSession
 	err := r.collection.FindOne(ctx, bson.M{"_id": id}).Decode(&session)
 	if err != nil {
@@ -63,7 +72,7 @@ func (r *ChatSessionRepo) GetByID(ctx context.Context, id primitive.ObjectID) (*
 	return &session, nil
 }
 
-func (r *ChatSessionRepo) Update(ctx context.Context, session *models.ChatSession) error {
+func (r *chatSessionRepo) Update(ctx context.Context, session *models.ChatSession) error {
 	session.UpdatedAt = time.Now()
 
 	filter := bson.M{"_id": session.ID}
@@ -76,7 +85,7 @@ func (r *ChatSessionRepo) Update(ctx context.Context, session *models.ChatSessio
 	return nil
 }
 
-func (r *ChatSessionRepo) EndSession(ctx context.Context, id primitive.ObjectID) error {
+func (r *chatSessionRepo) EndSession(ctx context.Context, id primitive.ObjectID) error {
 	now := time.Now()
 	filter := bson.M{"_id": id}
 	update := bson.M{
@@ -94,7 +103,7 @@ func (r *ChatSessionRepo) EndSession(ctx context.Context, id primitive.ObjectID)
 	return nil
 }
 
-func (r *ChatSessionRepo) ListActiveSessions(ctx context.Context) ([]*models.ChatSession, error) {
+func (r *chatSessionRepo) ListActiveSessions(ctx context.Context) ([]*models.ChatSession, error) {
 	filter := bson.M{"status": models.SessionStatusActive}
 	cursor, err := r.collection.Find(ctx, filter)
 	if err != nil {
