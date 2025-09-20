@@ -8,7 +8,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/carousell/ct-go/pkg/logger"
+	log "github.com/carousell/ct-go/pkg/logger/log_context"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
@@ -136,21 +136,19 @@ func (gs *GenkitService) createSessionContext(data *PromptData) (SessionContext,
 }
 
 func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.ChatMode, data *PromptData) error {
-	log := logger.MustNamed("genkit_service")
-
 	// Evaluate the  condition first
 	shouldProcess, err := gs.evaluateCondition(chatMode.Condition, data)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate when condition: %w", err)
 	}
 	if !shouldProcess {
-		log.Infow("When condition evaluated to false, stopping processing",
+		log.Infow(ctx, "When condition evaluated to false, stopping processing",
 			"chat_mode", chatMode.Name,
 			"sender_role", data.SenderRole,
 			"user_id", data.UserID)
 		return nil
 	}
-	log.Infow("When condition evaluated to true, proceeding with processing",
+	log.Infow(ctx, "When condition evaluated to true, proceeding with processing",
 		"chat_mode", chatMode.Name,
 		"sender_role", data.SenderRole)
 
@@ -159,7 +157,7 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 		return fmt.Errorf("failed to build prompt: %w", err)
 	}
 
-	log.Infow("Processing message", "chat_mode", chatMode.Name, "session_id", data.SessionID)
+	log.Infow(ctx, "Processing message", "chat_mode", chatMode.Name, "session_id", data.SessionID)
 
 	// Create session context for this request and set it as current session
 	session, err := gs.createSessionContext(data)
@@ -197,7 +195,7 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 
 	// Agent loop: iterate until no more tools are called or max iterations reached
 	for i := 0; i < chatMode.MaxIterations; i++ {
-		log.Infow("Agent iteration", "current", i+1, "max", chatMode.MaxIterations)
+		log.Infow(ctx, "Agent iteration", "current", i+1, "max", chatMode.MaxIterations)
 
 		// Convert tools to ToolRef
 		var toolRefs []ai.ToolRef
@@ -218,23 +216,23 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 		// Add assistant response to conversation
 		if response.Text() != "" {
 			messages = append(messages, ai.NewModelTextMessage(response.Text()))
-			log.Infow("AI generated text response", "response", response.Text())
+			log.Infow(ctx, "AI generated text response", "response", response.Text())
 		}
 
 		// Check if there are tool requests in the response
 		toolRequests := response.ToolRequests()
 		if len(toolRequests) == 0 {
-			log.Infow("No tool requests found", "ai_response", response.Text())
-			log.Info("Ending conversation - AI did not use any tools")
+			log.Infow(ctx, "No tool requests found", "ai_response", response.Text())
+			log.Info(ctx, "Ending conversation - AI did not use any tools")
 			break
 		}
 
-		log.Infow("Processing tool requests", "count", len(toolRequests))
+		log.Infow(ctx, "Processing tool requests", "count", len(toolRequests))
 
 		// Execute tools and add responses to conversation
 		var toolResponseParts []*ai.Part
 		for _, req := range toolRequests {
-			log.Infow("Executing tool", "tool_name", req.Name)
+			log.Infow(ctx, "Executing tool", "tool_name", req.Name)
 
 			// Find the tool by name
 			var tool ai.Tool
@@ -246,18 +244,18 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 			}
 
 			if tool == nil {
-				log.Errorw("Tool not found", "tool_name", req.Name)
+				log.Errorw(ctx, "Tool not found", "tool_name", req.Name)
 				continue
 			}
 
 			// Execute the tool
 			output, err := tool.RunRaw(ctx, req.Input)
 			if err != nil {
-				log.Errorw("Tool execution failed", "tool_name", req.Name, "error", err)
+				log.Errorw(ctx, "Tool execution failed", "tool_name", req.Name, "error", err)
 				continue
 			}
 
-			log.Infow("Tool executed successfully", "tool_name", req.Name)
+			log.Infow(ctx, "Tool executed successfully", "tool_name", req.Name)
 
 			// Add tool response to the conversation
 			toolResponseParts = append(toolResponseParts,
@@ -275,12 +273,12 @@ func (gs *GenkitService) ProcessMessage(ctx context.Context, chatMode *models.Ch
 
 		// Check if session has been ended by a tool
 		if session.IsEnded() {
-			log.Info("Session has been terminated by tool execution, ending conversation")
+			log.Info(ctx, "Session has been terminated by tool execution, ending conversation")
 			break
 		}
 	}
 
-	log.Infow("Agent processing complete", "session_id", data.SessionID)
+	log.Infow(ctx, "Agent processing complete", "session_id", data.SessionID)
 	return nil
 }
 

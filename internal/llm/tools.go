@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
+	log "github.com/carousell/ct-go/pkg/logger/log_context"
 	"github.com/nguyentranbao-ct/chat-bot/internal/client"
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repository"
@@ -110,7 +110,7 @@ func (s *sessionContext) EndSession() error {
 	}
 
 	s.ended = true
-	log.Printf("Session %s ended successfully", s.sessionID.Hex())
+	log.Infof(context.Background(), "Session %s ended successfully", s.sessionID.Hex())
 	return nil
 }
 
@@ -168,10 +168,10 @@ func (tm *ToolsManager) triggerBuy(ctx context.Context, args TriggerBuyArgs, ses
 		}
 
 		if err := tm.chatAPIClient.SendMessage(ctx, message); err != nil {
-			log.Printf("Failed to send message after TriggerBuy: %v", err)
+			log.Errorf(ctx, "Failed to send message after TriggerBuy: %v", err)
 			// Don't return error, just log it - we still want to log the activity
 		} else {
-			log.Printf("Message sent to channel %s after TriggerBuy", session.GetChannelID())
+			log.Infof(ctx, "Message sent to channel %s after TriggerBuy", session.GetChannelID())
 		}
 	}
 
@@ -183,10 +183,10 @@ func (tm *ToolsManager) triggerBuy(ctx context.Context, args TriggerBuyArgs, ses
 	}
 
 	if err := tm.activityRepo.Create(ctx, activity); err != nil {
-		log.Printf("Failed to log TriggerBuy activity: %v", err)
+		log.Errorf(ctx, "Failed to log TriggerBuy activity: %v", err)
 	}
 
-	log.Printf("Purchase intent logged: %s wants to buy %s for %s", session.GetUserID(), args.ItemName, args.ItemPrice)
+	log.Infof(ctx, "Purchase intent logged: %s wants to buy %s for %s", session.GetUserID(), args.ItemName, args.ItemPrice)
 	return nil
 }
 
@@ -209,10 +209,10 @@ func (tm *ToolsManager) replyMessage(ctx context.Context, args ReplyMessageArgs,
 	}
 
 	if err := tm.activityRepo.Create(ctx, activity); err != nil {
-		log.Printf("Failed to log ReplyMessage activity: %v", err)
+		log.Errorf(ctx, "Failed to log ReplyMessage activity: %v", err)
 	}
 
-	log.Printf("Message sent to channel %s", session.GetChannelID())
+	log.Infof(ctx, "Message sent to channel %s", session.GetChannelID())
 	return nil
 }
 
@@ -261,15 +261,15 @@ func (tm *ToolsManager) fetchMessages(ctx context.Context, args FetchMessagesArg
 	}
 
 	if err := tm.activityRepo.Create(ctx, activity); err != nil {
-		log.Printf("Failed to log FetchMessages activity: %v", err)
+		log.Errorf(ctx, "Failed to log FetchMessages activity: %v", err)
 	}
 
-	log.Printf("Fetched %d messages from channel %s", len(history.Messages), session.GetChannelID())
+	log.Infof(ctx, "Fetched %d messages from channel %s", len(history.Messages), session.GetChannelID())
 	return history, nil
 }
 
 func (tm *ToolsManager) endSession(ctx context.Context, args EndSessionArgs, session SessionContext) error {
-	log.Printf("Ending session %s as requested by tool", session.GetSessionID().Hex())
+	log.Infof(ctx, "Ending session %s as requested by tool", session.GetSessionID().Hex())
 	// Use the SessionContext's EndSession method
 	if err := session.EndSession(); err != nil {
 		return fmt.Errorf("failed to end session: %w", err)
@@ -283,7 +283,7 @@ func (tm *ToolsManager) endSession(ctx context.Context, args EndSessionArgs, ses
 	}
 
 	if err := tm.activityRepo.Create(ctx, activity); err != nil {
-		log.Printf("Failed to log EndSession activity: %v", err)
+		log.Errorf(ctx, "Failed to log EndSession activity: %v", err)
 	}
 
 	return nil

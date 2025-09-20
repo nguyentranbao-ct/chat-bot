@@ -3,9 +3,9 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
+	log "github.com/carousell/ct-go/pkg/logger/log_context"
 	"github.com/nguyentranbao-ct/chat-bot/internal/client"
 	"github.com/nguyentranbao-ct/chat-bot/internal/llm"
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
@@ -41,7 +41,7 @@ func NewMessageUsecase(
 }
 
 func (uc *messageUsecase) ProcessMessage(ctx context.Context, message *models.IncomingMessage) error {
-	log.Printf("Processing message from user %s in channel %s", message.SenderID, message.ChannelID)
+	log.Infof(ctx, "Processing message from user %s in channel %s", message.SenderID, message.ChannelID)
 
 	// Get channel info first to check seller whitelist
 	channelInfo, err := uc.chatAPIClient.GetChannelInfo(ctx, message.ChannelID)
@@ -52,13 +52,13 @@ func (uc *messageUsecase) ProcessMessage(ctx context.Context, message *models.In
 	// Find seller ID from channel participants and check whitelist
 	sellerID := findSellerIDFromChannel(channelInfo)
 	if sellerID == "" {
-		log.Printf("No seller found in channel %s, skipping message", message.ChannelID)
+		log.Infof(ctx, "No seller found in channel %s, skipping message", message.ChannelID)
 		return nil // Skip message if no seller found
 	}
 
 	// Check if seller is whitelisted
 	if !uc.whitelistService.IsSellerAllowed(sellerID) {
-		log.Printf("Ignoring message from non-whitelisted seller %s in channel %s", sellerID, message.ChannelID)
+		log.Infof(ctx, "Ignoring message from non-whitelisted seller %s in channel %s", sellerID, message.ChannelID)
 		return nil // Skip message if seller not whitelisted
 	}
 
@@ -78,7 +78,7 @@ func (uc *messageUsecase) ProcessMessage(ctx context.Context, message *models.In
 	// Fetch 20 recent messages for context
 	recentMessages, err := uc.fetchRecentMessages(ctx, message.SenderID, message.ChannelID)
 	if err != nil {
-		log.Printf("Failed to fetch recent messages: %v", err)
+		log.Errorf(ctx, "Failed to fetch recent messages: %v", err)
 		// Continue without recent messages rather than failing
 		recentMessages = &models.MessageHistory{Messages: []models.HistoryMessage{}}
 	}
@@ -96,7 +96,7 @@ func (uc *messageUsecase) ProcessMessage(ctx context.Context, message *models.In
 		return fmt.Errorf("failed to process with Genkit: %w", err)
 	}
 
-	log.Printf("Successfully processed message for session %s", session.ID.Hex())
+	log.Infof(ctx, "Successfully processed message for session %s", session.ID.Hex())
 	return nil
 }
 
@@ -113,7 +113,7 @@ func (uc *messageUsecase) newSession(ctx context.Context, message *models.Incomi
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
-	log.Printf("Created new session %s for user %s in channel %s", session.ID.Hex(), message.SenderID, message.ChannelID)
+	log.Infof(ctx, "Created new session %s for user %s in channel %s", session.ID.Hex(), message.SenderID, message.ChannelID)
 	return session, nil
 }
 
