@@ -40,6 +40,7 @@
     - PurchaseIntent
     - ReplyMessage
     - FetchMessages
+    - ListProducts
     - EndSession
   max_iterations: 10
   max_prompt_tokens: 4000
@@ -125,6 +126,7 @@
     - PurchaseIntent
     - ReplyMessage
     - FetchMessages
+    - ListProducts
     - EndSession
   max_iterations: 12
   max_prompt_tokens: 6000

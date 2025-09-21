@@ -10,7 +10,7 @@ test-coverage: test
 
 # Run linter
 lint:
-	golangci-lint run
+	golangci-lint run --new-from-rev origin/main
 
 # Generate mocks
 mock:

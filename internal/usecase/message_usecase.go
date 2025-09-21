@@ -45,10 +45,19 @@ func NewMessageUsecase(
 func (uc *messageUsecase) ProcessMessage(ctx context.Context, message models.IncomingMessage) error {
 	log.Infof(ctx, "Processing message from user %s in channel %s", message.SenderID, message.ChannelID)
 
-	// Get channel info first to check seller whitelist
+	// Get channel info first to check sender role and seller whitelist
 	channelInfo, err := uc.chatAPIClient.GetChannelInfo(ctx, message.ChannelID)
 	if err != nil {
 		return fmt.Errorf("failed to get channel info: %w", err)
+	}
+
+	// Find sender role from channel participants
+	senderRole := findSenderRole(channelInfo, message.SenderID)
+
+	// Skip processing if message is from seller (bot acts as seller, so this prevents loops)
+	if senderRole == "seller" {
+		log.Infof(ctx, "Skipping message from seller %s in channel %s to prevent bot loops", message.SenderID, message.ChannelID)
+		return nil
 	}
 
 	// Find seller ID from channel participants and check whitelist
@@ -73,9 +82,6 @@ func (uc *messageUsecase) ProcessMessage(ctx context.Context, message models.Inc
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
-
-	// Find sender role from channel participants
-	senderRole := findSenderRole(channelInfo, message.SenderID)
 
 	// Fetch 20 recent messages for context
 	recentMessages, err := uc.fetchRecentMessages(ctx, message.SenderID, message.ChannelID)

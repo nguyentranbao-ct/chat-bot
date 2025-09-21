@@ -1,20 +1,24 @@
 ---
 - user_email: 'test@example.com'
   key: 'chotot_id'
-  value: 'test_seller_123'
+  value: '10929165'
   tags: ['chotot', 'link_id']
+
 - user_email: 'test@example.com'
   key: 'chotot_oid'
-  value: '123456'
+  value: 'ebb1d506e8b8de644fc209d933f5c76a'
   tags: ['chotot', 'account_oid']
+
 - user_email: 'demo@example.com'
   key: 'chotot_id'
-  value: 'demo_seller_456'
+  value: '11198316'
   tags: ['chotot', 'link_id']
+
 - user_email: 'demo@example.com'
   key: 'chotot_oid'
-  value: '789012'
+  value: '7c959ccf9350ef33fc85e65f4dcc5eac'
   tags: ['chotot', 'account_oid']
+
 - user_email: 'test@example.com'
   key: 'facebook_id'
   value: 'fb_test_123'

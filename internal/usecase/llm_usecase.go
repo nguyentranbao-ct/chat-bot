@@ -16,6 +16,7 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/end_session"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/fetch_messages"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/list_products"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/purchase_intent"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/reply_message"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
@@ -40,10 +41,11 @@ func NewLLMUsecase(
 	cfg *config.Config,
 	toolsManager toolsmanager.ToolsManager,
 	sessionRepo mongodb.ChatSessionRepository,
-	endSessionTool end_session.Tool, // auto register
-	fetchMessagesTool fetch_messages.Tool, // auto register
-	replyMessageTool reply_message.Tool, // auto register
-	purchaseIntentTool purchase_intent.Tool, // auto register
+	endSessionTool end_session.Tool,
+	fetchMessagesTool fetch_messages.Tool,
+	replyMessageTool reply_message.Tool,
+	purchaseIntentTool purchase_intent.Tool,
+	listProductsTool list_products.Tool,
 ) (LLMUsecase, error) {
 	util.PanicOnError(
 		"register tools",
@@ -51,6 +53,7 @@ func NewLLMUsecase(
 		toolsManager.AddTool(fetchMessagesTool),
 		toolsManager.AddTool(replyMessageTool),
 		toolsManager.AddTool(purchaseIntentTool),
+		toolsManager.AddTool(listProductsTool),
 	)
 
 	return &llmUsecase{

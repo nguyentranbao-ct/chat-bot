@@ -8,25 +8,27 @@ import (
 	"time"
 )
 
-// ChototAd represents the raw response from Chotot API
+type AdsResponse struct {
+	Info ChototAd `json:"info"`
+}
 type ChototAd struct {
-	AdID         int                 `json:"ad_id"`
-	ListID       int                 `json:"list_id"`
-	AccountID    int                 `json:"account_id"`
-	AccountOID   string              `json:"account_oid"`
-	Subject      string              `json:"subject"`
-	Title        string              `json:"title"`
-	Category     int                 `json:"category"`
-	BigCate      int                 `json:"bigCate"`
-	Price        int                 `json:"price"`
-	PriceString  string              `json:"price_string"`
-	Region       int                 `json:"region"`
-	RegionName   string              `json:"region_name"`
-	AreaV2       string              `json:"area_v2"`
-	AreaName     string              `json:"area_name"`
-	Date         string              `json:"date"`
-	Images       []string            `json:"images"`
-	Params       []ChototAdParam     `json:"params"`
+	AdID        int             `json:"ad_id"`
+	ListID      int             `json:"list_id"`
+	AccountID   int             `json:"account_id"`
+	AccountOID  string          `json:"account_oid"`
+	Subject     string          `json:"subject"`
+	Title       string          `json:"title"`
+	Category    int             `json:"category"`
+	BigCate     int             `json:"bigCate"`
+	Price       string          `json:"price"`
+	PriceString string          `json:"price_string"`
+	Region      int             `json:"region"`
+	RegionName  string          `json:"region_name"`
+	AreaV2      string          `json:"area_v2"`
+	AreaName    string          `json:"area_name"`
+	Date        string          `json:"date"`
+	Images      []string        `json:"images"`
+	Params      []ChototAdParam `json:"params"`
 }
 
 type ChototAdParam struct {
@@ -34,13 +36,13 @@ type ChototAdParam struct {
 	Value string `json:"value"`
 }
 
-type ChototResponse struct {
-	Ads   []ChototAd `json:"ads"`
-	Total int        `json:"total"`
+type GetUserAdsResponse struct {
+	Ads   []AdsResponse `json:"ads"`
+	Total int           `json:"total"`
 }
 
 type Client interface {
-	GetUserAds(ctx context.Context, accountOID string, limit, page int) (*ChototResponse, error)
+	GetUserAds(ctx context.Context, accountOID string, limit, page int) (*GetUserAdsResponse, error)
 }
 
 type client struct {
@@ -57,7 +59,7 @@ func NewClient() Client {
 	}
 }
 
-func (c *client) GetUserAds(ctx context.Context, accountOID string, limit, page int) (*ChototResponse, error) {
+func (c *client) GetUserAds(ctx context.Context, accountOID string, limit, page int) (*GetUserAdsResponse, error) {
 	if limit <= 0 {
 		limit = 9
 	}
@@ -82,7 +84,7 @@ func (c *client) GetUserAds(ctx context.Context, accountOID string, limit, page 
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
 
-	var chototResp ChototResponse
+	var chototResp GetUserAdsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&chototResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}

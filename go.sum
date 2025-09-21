@@ -19,8 +19,6 @@ github.com/caarlos0/env/v11 v11.3.1 h1:cArPWC15hWmEt+gWk7YBi7lEXTXCvpaSdCiZE2X5m
 github.com/caarlos0/env/v11 v11.3.1/go.mod h1:qupehSf/Y0TUTsxKywqRt/vJjN5nz6vauiYEUUr8P4U=
 github.com/carousell/chat-api v0.0.0-20250918074315-52169473979d h1:fjmt/zwnVKm71FqtcRQ3F23/ahsKleXt3Q5lATsYSq0=
 github.com/carousell/chat-api v0.0.0-20250918074315-52169473979d/go.mod h1:k9vNFmRmjyRv18/Okw2UEdMNQhSmaQUdsaRe8d3Ayqg=
-github.com/carousell/ct-communication-notification-worker v0.0.0-20250521073105-be9dbb759b85 h1:37nV3Jc56Rpyrzyuq//J84oDU+ps048Pgr/kAjUdGfo=
-github.com/carousell/ct-communication-notification-worker v0.0.0-20250521073105-be9dbb759b85/go.mod h1:p5yh649J+6wh2GdrHBhcW4lSFd47V/OWI6oblzBTzqA=
 github.com/carousell/ct-go/pkg/httpclient v0.12.0 h1:NbVa+n1SNFJjQ0sgdbhDIgZmmYA8IQpMJgHAEZ+wJAo=
 github.com/carousell/ct-go/pkg/httpclient v0.12.0/go.mod h1:jmgKX0MGZmxpgSngpvzmJ9+OxymnWHvRy7JBaTKsQ5I=
 github.com/carousell/ct-go/pkg/httputils v0.3.0 h1:jwZ3teytIzpGceRogpYrojW+lrf1LZm1P8DgqeftTpc=

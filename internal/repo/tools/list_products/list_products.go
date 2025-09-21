@@ -16,7 +16,7 @@ import (
 
 const (
 	ToolName        = "ListProducts"
-	ToolDescription = "List products for a user from their linked external service accounts"
+	ToolDescription = "Retrieve and display the seller's product listings when buyers ask about available items, inventory, what's for sale, or want to browse products. Use this when customers inquire about merchandise, catalog, or what the seller has in stock. Fetches products from linked external service accounts like Chotot with details including name, price, category, and images."
 )
 
 // ListProductsInput defines the input arguments for the ListProducts tool
@@ -156,6 +156,7 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 		"internal_user_id", internalUserID.Hex(),
 		"chotot_oid", chototOIDAttr.Value,
 		"products_count", len(products),
+		"products", products,
 		"total_available", total)
 
 	return output, nil
@@ -188,7 +189,6 @@ func (t *tool) parseArgs(args interface{}, target interface{}) error {
 	}
 	return nil
 }
-
 
 // logActivity logs the tool execution activity
 func (t *tool) logActivity(ctx context.Context, input ListProductsInput, session toolsmanager.SessionContext) error {

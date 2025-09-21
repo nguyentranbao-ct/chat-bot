@@ -56,7 +56,6 @@ func Invoke(funcs ...any) *fx.App {
 			chatapi.NewChatAPIClient,
 			chotot.NewClient,
 			list_products.NewProductServiceRegistry,
-			newChototServiceWithRegistry,
 
 			toolsmanager.NewToolsManager,
 
@@ -68,6 +67,7 @@ func Invoke(funcs ...any) *fx.App {
 		),
 		fx.Supply(conf),
 		fx.Invoke(InitializeUsers),
+		fx.Invoke(InitializeProductServices),
 		fx.Invoke(funcs...),
 	)
 }
@@ -80,14 +80,20 @@ func newGenkitClient(cfg *config.Config) (*genkit.Genkit, error) {
 	return genkit.Init(ctx, genkit.WithPlugins(googleAI)), nil
 }
 
-// newChototServiceWithRegistry creates the chotot service and registers it with the registry
-func newChototServiceWithRegistry(
+// InitializeProductServices registers all product services with the registry using fx lifecycle
+func InitializeProductServices(
+	lc fx.Lifecycle,
 	client chotot.Client,
 	registry list_products.ProductServiceRegistry,
-) *chotot.ProductService {
-	service := chotot.NewProductService(client)
-	registry.RegisterService("chotot", service)
-	return service
+) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			// Register chotot product service
+			chototService := chotot.NewProductService(client)
+			registry.RegisterService("chotot", chototService)
+			return nil
+		},
+	})
 }
 
 // InitializeUsers initializes default users and attributes on startup
