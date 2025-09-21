@@ -58,6 +58,18 @@ func StartServer(
 	api := e.Group("/api/v1")
 	api.POST("/messages", handler.ProcessMessage)
 
+	// User management routes
+	api.POST("/users", handler.CreateUser)
+	api.GET("/users/:id", handler.GetUser)
+	api.PUT("/users/:id", handler.UpdateUser)
+	api.DELETE("/users/:id", handler.DeleteUser)
+
+	// User attributes routes
+	api.POST("/users/:id/attributes", handler.SetUserAttribute)
+	api.GET("/users/:id/attributes", handler.GetUserAttributes)
+	api.GET("/users/:id/attributes/:key", handler.GetUserAttributeByKey)
+	api.DELETE("/users/:id/attributes/:key", handler.RemoveUserAttribute)
+
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			go func() {

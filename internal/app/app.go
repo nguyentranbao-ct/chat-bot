@@ -8,9 +8,11 @@ import (
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chotot"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/end_session"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/fetch_messages"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/list_products"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/purchase_intent"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/reply_message"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
@@ -42,19 +44,30 @@ func Invoke(funcs ...any) *fx.App {
 			usecase.NewLLMUsecase,
 			usecase.NewMessageUsecase,
 			usecase.NewWhitelistService,
+			usecase.NewUserUsecase,
 
 			mongodb.NewChatActivityRepository,
 			mongodb.NewChatModeRepository,
 			mongodb.NewChatSessionRepository,
 			mongodb.NewPurchaseIntentRepository,
+			mongodb.NewUserRepository,
+			mongodb.NewUserAttributeRepository,
+
 			chatapi.NewChatAPIClient,
+			chotot.NewClient,
+			list_products.NewProductServiceRegistry,
+			newChototServiceWithRegistry,
+
 			toolsmanager.NewToolsManager,
+
 			end_session.NewTool,
 			purchase_intent.NewTool,
 			fetch_messages.NewTool,
 			reply_message.NewTool,
+			list_products.NewTool,
 		),
 		fx.Supply(conf),
+		fx.Invoke(InitializeUsers),
 		fx.Invoke(funcs...),
 	)
 }
@@ -65,4 +78,27 @@ func newGenkitClient(cfg *config.Config) (*genkit.Genkit, error) {
 		APIKey: cfg.LLM.GoogleAIAPIKey,
 	}
 	return genkit.Init(ctx, genkit.WithPlugins(googleAI)), nil
+}
+
+// newChototServiceWithRegistry creates the chotot service and registers it with the registry
+func newChototServiceWithRegistry(
+	client chotot.Client,
+	registry list_products.ProductServiceRegistry,
+) *chotot.ProductService {
+	service := chotot.NewProductService(client)
+	registry.RegisterService("chotot", service)
+	return service
+}
+
+// InitializeUsers initializes default users and attributes on startup
+func InitializeUsers(
+	lc fx.Lifecycle,
+	userRepo mongodb.UserRepository,
+	userAttrRepo mongodb.UserAttributeRepository,
+) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return usecase.AutoMigrateUsers(userRepo, userAttrRepo)
+		},
+	})
 }

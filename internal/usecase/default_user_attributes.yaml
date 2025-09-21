@@ -1,0 +1,13 @@
+---
+- user_email: 'test@example.com'
+  key: 'chotot_id'
+  value: '123456'
+  tags: ['chotot', 'link_id']
+- user_email: 'demo@example.com'
+  key: 'chotot_id'
+  value: '789012'
+  tags: ['chotot', 'link_id']
+- user_email: 'test@example.com'
+  key: 'facebook_id'
+  value: 'fb_test_123'
+  tags: ['facebook', 'social']

@@ -7,17 +7,18 @@ import (
 )
 
 type ChatMode struct {
-	ID                primitive.ObjectID `bson:"_id,omitempty" json:"id" yaml:"-"`
-	Name              string             `bson:"name" json:"name" yaml:"name"`
-	PromptTemplate    string             `bson:"prompt_template" json:"prompt_template" yaml:"prompt_template"`
-	Condition         string             `bson:"condition" json:"condition" yaml:"condition"`
-	Model             string             `bson:"model" json:"model" yaml:"model"`
-	Tools             []string           `bson:"tools" json:"tools" yaml:"tools"`
-	MaxIterations     int                `bson:"max_iterations" json:"max_iterations" yaml:"max_iterations"`
-	MaxPromptTokens   int                `bson:"max_prompt_tokens" json:"max_prompt_tokens" yaml:"max_prompt_tokens"`
-	MaxResponseTokens int                `bson:"max_response_tokens" json:"max_response_tokens" yaml:"max_response_tokens"`
-	CreatedAt         time.Time          `bson:"created_at" json:"created_at" yaml:"-"`
-	UpdatedAt         time.Time          `bson:"updated_at" json:"updated_at" yaml:"-"`
+	ID                primitive.ObjectID  `bson:"_id,omitempty" json:"id" yaml:"-"`
+	Name              string              `bson:"name" json:"name" yaml:"name"`
+	PromptTemplate    string              `bson:"prompt_template" json:"prompt_template" yaml:"prompt_template"`
+	Condition         string              `bson:"condition" json:"condition" yaml:"condition"`
+	Model             string              `bson:"model" json:"model" yaml:"model"`
+	Tools             []string            `bson:"tools" json:"tools" yaml:"tools"`
+	MaxIterations     int                 `bson:"max_iterations" json:"max_iterations" yaml:"max_iterations"`
+	MaxPromptTokens   int                 `bson:"max_prompt_tokens" json:"max_prompt_tokens" yaml:"max_prompt_tokens"`
+	MaxResponseTokens int                 `bson:"max_response_tokens" json:"max_response_tokens" yaml:"max_response_tokens"`
+	UserID            *primitive.ObjectID `bson:"user_id,omitempty" json:"user_id,omitempty" yaml:"user_id,omitempty"`
+	CreatedAt         time.Time           `bson:"created_at" json:"created_at" yaml:"-"`
+	UpdatedAt         time.Time           `bson:"updated_at" json:"updated_at" yaml:"-"`
 }
 
 type ChatSession struct {
@@ -70,4 +71,5 @@ const (
 	ActivityReplyMessage   ActivityAction = "reply_message"
 	ActivityFetchMessages  ActivityAction = "fetch_messages"
 	ActivityEndSession     ActivityAction = "end_session"
+	ActivityListProducts   ActivityAction = "list_products"
 )
