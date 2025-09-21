@@ -62,31 +62,38 @@ mkdir -p pkg/models
 ### 2. File Migration Mapping
 
 #### Keep as-is (no changes)
+
 - `internal/app/` → `internal/app/` (FX providers and DI setup)
 - `internal/config/` → `internal/config/` (stays internal, not shared)
 - `internal/kafka/` → `internal/kafka/` (Kafka handlers)
 - `internal/usecase/` → `internal/usecase/` (Domain logic)
 
 #### Rename and move
+
 - `internal/handler/` → `internal/server/`
+
   - `message_handler.go` → `server/message_handler.go`
   - `routes.go` → `server/routes.go`
   - `middleware.go` → `server/middleware.go`
 
 - `internal/repository/` → `internal/repo/mongodb/`
+
   - `interfaces.go` → Delete (interfaces go at top of implementation files)
   - `mongodb/` → `repo/mongodb/` (MongoDB implementations with interfaces at top)
 
 - `internal/client/` → `internal/repo/chatapi/`
+
   - All chat-api client code moves to `repo/chatapi/`
 
 - `internal/llm/` → `internal/repo/llm/`
   - All LLM service and tools move to `repo/llm/`
 
 #### Move to shared packages
+
 - `internal/models/` → `pkg/models/`
 
 #### Merge into existing
+
 - `internal/service/` → Merge into `internal/usecase/`
   - `whitelist.go` → `usecase/whitelist_usecase.go`
   - `chat_mode_initializer.go` → `usecase/chat_mode_usecase.go`
@@ -94,6 +101,7 @@ mkdir -p pkg/models
 ### 3. Import Path Updates
 
 #### Before
+
 ```go
 "github.com/nguyentranbao-ct/chat-bot/internal/models"
 "github.com/nguyentranbao-ct/chat-bot/internal/config"
@@ -104,8 +112,9 @@ mkdir -p pkg/models
 ```
 
 #### After
+
 ```go
-"github.com/nguyentranbao-ct/chat-bot/pkg/models"
+"github.com/nguyentranbao-ct/chat-bot/internal/models"
 "github.com/nguyentranbao-ct/chat-bot/internal/config"
 "github.com/nguyentranbao-ct/chat-bot/internal/server"
 "github.com/nguyentranbao-ct/chat-bot/internal/repo"
@@ -116,6 +125,7 @@ mkdir -p pkg/models
 ### 4. Interface Exposure and Method Argument Patterns
 
 #### Interface Exposure Pattern
+
 All handlers must expose interfaces at the top of implementation files (no separate interfaces.go):
 
 ```go
@@ -135,6 +145,7 @@ func NewHandler(usecase usecase.MessageUsecase) Handler {  // returns interface
 ```
 
 #### Method Argument Pattern (Max 3 args)
+
 For methods with >3 arguments, use struct:
 
 ```go
@@ -159,6 +170,7 @@ func (u *messageUsecase) ProcessMessage(ctx context.Context, args ProcessMessage
 ```
 
 #### Constructor Pattern (OK to have many args)
+
 ```go
 // Constructor functions can have many arguments
 func NewMessageUsecase(
@@ -187,7 +199,7 @@ Update `internal/app/app.go` to reflect new import paths and interface usage:
 ```go
 // Update imports
 import (
-    "github.com/nguyentranbao-ct/chat-bot/pkg/models"
+    "github.com/nguyentranbao-ct/chat-bot/internal/models"
     "github.com/nguyentranbao-ct/chat-bot/internal/config"
     "github.com/nguyentranbao-ct/chat-bot/internal/server"
     "github.com/nguyentranbao-ct/chat-bot/internal/usecase"
@@ -217,31 +229,37 @@ func NewMessageHandler(messageUsecase usecase.MessageUsecase) server.Handler {
 ## Benefits of New Structure
 
 ### 1. Clear Architectural Flow
+
 - **cmd** → **app** → **server/kafka** → **usecase** → **repo**
 - No circular dependencies
 - Clear separation of concerns
 
 ### 2. External Dependencies Grouped
+
 - All external integrations in `repo/` (MongoDB, Chat-API, LLM)
 - Clear boundary between domain logic and external systems
 
 ### 3. Shared Code in pkg/
+
 - Models accessible by all layers
 - Config stays internal (not shared)
 - Follows Go project layout standards
 
 ### 4. Interface Pattern Benefits
+
 - Interfaces defined at top of implementation files
 - No separate interfaces.go files to maintain
 - Clear contract definition with implementation
 - Easy mocking for tests
 
 ### 5. Consistent Function Signatures
+
 - Max 3 arguments for methods (struct if more needed)
 - Constructor functions can have many arguments
 - Clear documentation of required dependencies
 
 ### 6. Better Testability
+
 - Clear dependency injection points
 - Easy to mock entire dependency groups
 - Isolated unit testing per layer
@@ -258,6 +276,7 @@ func NewMessageHandler(messageUsecase usecase.MessageUsecase) server.Handler {
 ## Validation
 
 After restructuring:
+
 - [ ] All tests pass
 - [ ] No circular import dependencies
 - [ ] Clear top-to-bottom flow maintained

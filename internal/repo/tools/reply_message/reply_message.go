@@ -9,10 +9,10 @@ import (
 	log "github.com/carousell/ct-go/pkg/logger/log_context"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
+	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
-	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
+	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -74,7 +74,7 @@ func (r *chatModeRepo) Upsert(ctx context.Context, mode *models.ChatMode) error 
 	filter := bson.M{"name": mode.Name}
 	update := bson.M{
 		"$set": bson.M{
-			"prompt_template":      mode.PromptTemplate,
+			"prompt_template":     mode.PromptTemplate,
 			"condition":           mode.Condition,
 			"model":               mode.Model,
 			"tools":               mode.Tools,

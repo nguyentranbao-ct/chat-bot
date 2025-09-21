@@ -8,8 +8,8 @@ import (
 
 	log "github.com/carousell/ct-go/pkg/logger/log_context"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
+	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
-	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 	"github.com/segmentio/kafka-go"
 	"go.uber.org/fx"
 )

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/carousell/ct-communication-notification-worker/pkg/ctxval"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/ctxval"
 	"github.com/stretchr/testify/assert"
 )
 

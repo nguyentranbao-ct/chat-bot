@@ -8,7 +8,7 @@ import (
 	"github.com/carousell/chat-api/handlers/types"
 	"github.com/carousell/chat-api/pkg/client"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
-	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
+	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 )
 
 type MessageHistoryRequest struct {

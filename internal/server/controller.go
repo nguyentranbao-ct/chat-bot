@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
-	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 )
 
 type Controller interface {
