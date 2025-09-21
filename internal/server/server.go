@@ -23,7 +23,6 @@ func StartServer(
 	authController AuthController,
 	chatController ChatController,
 	authUsecase *usecase.AuthUseCase,
-	socketHandler *SocketHandler,
 ) {
 	e := echo.New()
 	e.Validator = pkgmdw.NewValidator()
@@ -103,9 +102,6 @@ func StartServer(
 	api.GET("/users/:id/attributes", handler.GetUserAttributes)
 	api.GET("/users/:id/attributes/:key", handler.GetUserAttributeByKey)
 	api.DELETE("/users/:id/attributes/:key", handler.RemoveUserAttribute)
-
-	// Socket.IO integration
-	e.Any("/socket.io/*", socketHandler.Handler())
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {

@@ -11,6 +11,7 @@ type Config struct {
 	LLM      LLMConfig      `envPrefix:"LLM_"`
 	Kafka    KafkaConfig    `envPrefix:"KAFKA_"`
 	JWT      JWTConfig      `envPrefix:"JWT_"`
+	Socket   SocketConfig   `envPrefix:"SOCKET_"`
 }
 
 type ServerConfig struct {
@@ -49,6 +50,10 @@ type KafkaConfig struct {
 
 type JWTConfig struct {
 	Secret string `env:"SECRET" envDefault:"your-jwt-secret-key-change-this-in-production"`
+}
+
+type SocketConfig struct {
+	BaseURL string `env:"BASE_URL" envDefault:"http://localhost:7070"`
 }
 
 func Load() (*Config, error) {

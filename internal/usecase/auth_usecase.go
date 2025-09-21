@@ -33,17 +33,19 @@ func (uc *AuthUseCase) Login(ctx context.Context, req models.LoginRequest, userA
 	// Find or create user by email
 	user, err := uc.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
-		// Create new user if not exists
-		user = &models.User{
-			Email:     req.Email,
-			IsActive:  true,
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
+		if errors.Is(err, models.ErrNotFound) {
+			// Create new user if not exists
+			user = &models.User{
+				Email:     req.Email,
+				IsActive:  true,
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			}
+			if err := uc.userRepo.Create(ctx, user); err != nil {
+				return nil, fmt.Errorf("failed to create user: %w", err)
+			}
 		}
-
-		if err := uc.userRepo.Create(ctx, user); err != nil {
-			return nil, fmt.Errorf("failed to create user: %w", err)
-		}
+		return nil, fmt.Errorf("failed to get user by email: %w", err)
 	}
 
 	// Update last login time and ensure user is active
@@ -193,7 +195,6 @@ func (uc *AuthUseCase) parseJWT(tokenString string) (*models.JWTClaims, error) {
 		}
 		return []byte(uc.jwtSecret), nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

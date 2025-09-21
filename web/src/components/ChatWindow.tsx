@@ -33,7 +33,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   // Mark last message as read when component mounts or messages change
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.sender_id !== currentUserId) {
         onMarkAsRead(lastMessage.id);
@@ -52,7 +52,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const renderMessageContent = (message: ChatMessage) => {
     // If message has blocks, render them
-    if (message.blocks && message.blocks.length > 0) {
+    if (message.blocks && Array.isArray(message.blocks) && message.blocks.length > 0) {
       return (
         <div className="space-y-2">
           {message.blocks.map((block, index) => (
@@ -80,7 +80,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
 
     // Otherwise render plain content
-    return <span>{message.content}</span>;
+    return <span>{message.content || ''}</span>;
   };
 
   return (
@@ -127,7 +127,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           ref={messagesContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50"
         >
-          {messages.length === 0 ? (
+          {!messages || messages.length === 0 ? (
             <div className="text-center text-gray-500 mt-8">
               No messages yet. Start the conversation!
             </div>
@@ -147,9 +147,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
                   <div className={`flex ${isFromCurrentUser ? 'justify-end' : 'justify-start'}`}>
                     <div
-                      className={`message-bubble ${
-                        isFromCurrentUser ? 'sent' : 'received'
-                      }`}
+                      className={`message-bubble ${isFromCurrentUser ? 'sent' : 'received'
+                        }`}
                     >
                       {renderMessageContent(message)}
 

@@ -23,14 +23,14 @@ type ChatController interface {
 }
 
 type chatController struct {
-	chatUsecase   *usecase.ChatUseCase
-	socketHandler *SocketHandler
+	chatUsecase       *usecase.ChatUseCase
+	socketBroadcaster usecase.SocketBroadcaster
 }
 
-func NewChatController(chatUsecase *usecase.ChatUseCase, socketHandler *SocketHandler) ChatController {
+func NewChatController(chatUsecase *usecase.ChatUseCase, socketBroadcaster usecase.SocketBroadcaster) ChatController {
 	return &chatController{
-		chatUsecase:   chatUsecase,
-		socketHandler: socketHandler,
+		chatUsecase:       chatUsecase,
+		socketBroadcaster: socketBroadcaster,
 	}
 }
 
@@ -94,10 +94,10 @@ func (cc *chatController) SendMessage(c echo.Context) error {
 	}
 
 	// Broadcast message to all channel members via socket
-	cc.socketHandler.BroadcastMessage(channelID.Hex(), message)
+	cc.socketBroadcaster.BroadcastMessage(channelID.Hex(), message)
 
 	// Send confirmation to sender
-	cc.socketHandler.BroadcastMessageSent(user.ID.Hex(), message)
+	cc.socketBroadcaster.BroadcastMessageSent(user.ID.Hex(), message)
 
 	return c.JSON(http.StatusCreated, message)
 }
@@ -224,7 +224,7 @@ func (cc *chatController) SetTyping(c echo.Context) error {
 	}
 
 	// Broadcast typing status to channel via socket
-	cc.socketHandler.BroadcastTyping(channelID.Hex(), user.ID.Hex(), req.IsTyping)
+	cc.socketBroadcaster.BroadcastTyping(channelID.Hex(), user.ID.Hex(), req.IsTyping)
 
 	return c.JSON(http.StatusOK, map[string]string{
 		"status": "success",

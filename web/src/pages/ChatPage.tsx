@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import ConversationList from '../components/ConversationList';
 import ChatWindow from '../components/ChatWindow';
-import { useSocket } from '../hooks/useSocket';
+import { useSocket } from '../contexts/SocketContext';
 import { api } from '../utils/api';
 import { getStoredUser, clearAuth } from '../utils/auth';
 import {
@@ -26,6 +26,55 @@ const ChatPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Define callback functions first
+  const loadChannels = useCallback(async () => {
+    try {
+      const channelData = await api.getChannels();
+      setChannels(channelData || []); // Ensure it's always an array
+    } catch (err: any) {
+      console.error('Failed to load channels:', err);
+      setError('Failed to load conversations');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const loadMessages = useCallback(async (channelId: string) => {
+    console.log('Loading messages for channel:', channelId);
+    try {
+      const messageData = await api.getChannelMessages(channelId);
+      console.log('Messages loaded:', messageData?.length || 0);
+      setMessages(messageData || []); // Ensure it's always an array
+    } catch (err: any) {
+      console.error('Failed to load messages:', err);
+      setError('Failed to load messages');
+      setMessages([]); // Set empty array on error
+    }
+  }, []);
+
+  const handleSendMessage = useCallback(async (request: SendMessageRequest) => {
+    if (!selectedChannel || !user) return;
+
+    try {
+      const message = await api.sendMessage(selectedChannel.id, request);
+      setMessages((prev) => [...prev, message]);
+      // Don't call loadChannels here - let socket handle updates
+    } catch (err: any) {
+      console.error('Failed to send message:', err);
+      setError('Failed to send message');
+    }
+  }, [selectedChannel, user]);
+
+  const handleMarkAsRead = useCallback(async (messageId: string) => {
+    if (!selectedChannel) return;
+
+    try {
+      await api.markAsRead(selectedChannel.id, messageId);
+    } catch (err: any) {
+      console.error('Failed to mark as read:', err);
+    }
+  }, [selectedChannel]);
+
   // Initialize user and data
   useEffect(() => {
     const storedUser = getStoredUser();
@@ -38,108 +87,88 @@ const ChatPage: React.FC = () => {
     loadChannels();
   }, [navigate]);
 
-  // Set up socket listeners
+  // Set up socket listeners - stable references to avoid re-renders
   useEffect(() => {
     const handleMessageReceived = (message: ChatMessage) => {
-      if (selectedChannel && message.channel_id === selectedChannel.id) {
-        setMessages((prev) => [...prev, message]);
-      }
-      // Update channel list to show new message
-      loadChannels();
+      setMessages((prev) => {
+        // Only add if it's for current channel and not already exists
+        if (selectedChannel?.id === message.channel_id && !prev.find(m => m.id === message.id)) {
+          return [...prev, message];
+        }
+        return prev;
+      });
+
+      // Refresh channels list to update last message
+      setChannels(prev => {
+        api.getChannels().then(channelData => {
+          if (channelData) setChannels(channelData);
+        }).catch(console.error);
+        return prev;
+      });
     };
 
     const handleMessageSent = (message: ChatMessage) => {
-      if (selectedChannel && message.channel_id === selectedChannel.id) {
-        setMessages((prev) => [...prev, message]);
-      }
+      setMessages((prev) => {
+        if (selectedChannel?.id === message.channel_id && !prev.find(m => m.id === message.id)) {
+          return [...prev, message];
+        }
+        return prev;
+      });
     };
 
     const handleTypingStart = (typing: TypingIndicator) => {
-      if (selectedChannel && typing.channel_id === selectedChannel.id && typing.user_id !== user?.id) {
+      if (selectedChannel?.id === typing.channel_id && typing.user_id !== user?.id) {
         setIsTyping(true);
       }
     };
 
     const handleTypingStop = (typing: TypingIndicator) => {
-      if (selectedChannel && typing.channel_id === selectedChannel.id && typing.user_id !== user?.id) {
+      if (selectedChannel?.id === typing.channel_id && typing.user_id !== user?.id) {
         setIsTyping(false);
       }
     };
 
-    socket.onMessageReceived(handleMessageReceived);
-    socket.onMessageSent(handleMessageSent);
-    socket.onTypingStart(handleTypingStart);
-    socket.onTypingStop(handleTypingStop);
+    // Only set up listeners if socket is available
+    if (socket.isConnected) {
+      socket.onMessageReceived(handleMessageReceived);
+      socket.onMessageSent(handleMessageSent);
+      socket.onTypingStart(handleTypingStart);
+      socket.onTypingStop(handleTypingStop);
 
-    return () => {
-      socket.offMessageReceived(handleMessageReceived);
-      socket.offMessageSent(handleMessageSent);
-      socket.offTypingStart(handleTypingStart);
-      socket.offTypingStop(handleTypingStop);
-    };
-  }, [socket, selectedChannel, user]);
+      return () => {
+        socket.offMessageReceived(handleMessageReceived);
+        socket.offMessageSent(handleMessageSent);
+        socket.offTypingStart(handleTypingStart);
+        socket.offTypingStop(handleTypingStop);
+      };
+    }
+  }, [selectedChannel?.id, user?.id, socket.isConnected]);
 
   // Join/leave channels when selection changes
   useEffect(() => {
     if (selectedChannel) {
-      socket.joinChannel(selectedChannel.id);
+      console.log('Channel changed to:', selectedChannel.id, 'Socket connected:', socket.isConnected);
+
+      // Only load messages, don't depend on socket connection for this
       loadMessages(selectedChannel.id);
 
+      // Try to join socket channel if connected
+      if (socket.isConnected) {
+        socket.joinChannel(selectedChannel.id);
+      }
+
       return () => {
-        socket.leaveChannel(selectedChannel.id);
+        if (socket.isConnected) {
+          socket.leaveChannel(selectedChannel.id);
+        }
       };
     }
-  }, [selectedChannel, socket]);
-
-  const loadChannels = async () => {
-    try {
-      const channelData = await api.getChannels();
-      setChannels(channelData);
-    } catch (err: any) {
-      console.error('Failed to load channels:', err);
-      setError('Failed to load conversations');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadMessages = async (channelId: string) => {
-    try {
-      const messageData = await api.getChannelMessages(channelId);
-      setMessages(messageData);
-    } catch (err: any) {
-      console.error('Failed to load messages:', err);
-      setError('Failed to load messages');
-    }
-  };
+  }, [selectedChannel]);
 
   const handleChannelSelect = (channel: Channel) => {
     setSelectedChannel(channel);
     setMessages([]);
     setIsTyping(false);
-  };
-
-  const handleSendMessage = async (request: SendMessageRequest) => {
-    if (!selectedChannel || !user) return;
-
-    try {
-      const message = await api.sendMessage(selectedChannel.id, request);
-      setMessages((prev) => [...prev, message]);
-      loadChannels(); // Refresh to update last message time
-    } catch (err: any) {
-      console.error('Failed to send message:', err);
-      setError('Failed to send message');
-    }
-  };
-
-  const handleMarkAsRead = async (messageId: string) => {
-    if (!selectedChannel) return;
-
-    try {
-      await api.markAsRead(selectedChannel.id, messageId);
-    } catch (err: any) {
-      console.error('Failed to mark as read:', err);
-    }
   };
 
   const handleLogout = async () => {

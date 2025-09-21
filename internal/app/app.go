@@ -7,9 +7,11 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
+	"github.com/nguyentranbao-ct/chat-bot/internal/kafka"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chotot"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/socket"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/end_session"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/fetch_messages"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/list_products"
@@ -18,7 +20,6 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
 	"github.com/nguyentranbao-ct/chat-bot/internal/server"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
-	"github.com/nguyentranbao-ct/chat-bot/internal/kafka"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap/zapcore"
@@ -46,7 +47,6 @@ func Invoke(funcs ...any) *fx.App {
 			server.NewHandler,
 			server.NewAuthController,
 			server.NewChatController,
-			server.NewSocketHandler,
 
 			// Use Cases
 			usecase.NewLLMUsecase,
@@ -75,6 +75,7 @@ func Invoke(funcs ...any) *fx.App {
 			chatapi.NewChatAPIClient,
 			chotot.NewClient,
 			list_products.NewProductServiceRegistry,
+			socket.NewClient,
 
 			// Tools Manager
 			toolsmanager.NewToolsManager,
@@ -88,6 +89,7 @@ func Invoke(funcs ...any) *fx.App {
 		),
 		fx.Supply(conf),
 		fx.Invoke(InitializeUsers),
+		fx.Invoke(InitializeChannels),
 		fx.Invoke(InitializeProductServices),
 		fx.Invoke(kafka.StartConsumeMessages),
 		fx.Invoke(funcs...),
@@ -106,8 +108,8 @@ func newJWTSecret(cfg *config.Config) string {
 	return cfg.JWT.Secret
 }
 
-func newSocketBroadcaster(socketHandler *server.SocketHandler) usecase.SocketBroadcaster {
-	return socketHandler
+func newSocketBroadcaster(client *socket.Client, cfg *config.Config) usecase.SocketBroadcaster {
+	return socket.NewBroadcaster(client, cfg.ChatAPI.ProjectID)
 }
 
 // InitializeProductServices registers all product services with the registry using fx lifecycle
@@ -135,6 +137,21 @@ func InitializeUsers(
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			return usecase.AutoMigrateUsers(userRepo, userAttrRepo)
+		},
+	})
+}
+
+// InitializeChannels initializes default channels and messages on startup
+func InitializeChannels(
+	lc fx.Lifecycle,
+	userRepo mongodb.UserRepository,
+	channelRepo mongodb.ChannelRepository,
+	channelMemberRepo mongodb.ChannelMemberRepository,
+	messageRepo mongodb.ChatMessageRepository,
+) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return usecase.AutoMigrateChannels(userRepo, channelRepo, channelMemberRepo, messageRepo)
 		},
 	})
 }

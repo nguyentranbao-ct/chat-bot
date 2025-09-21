@@ -25,6 +25,7 @@ type ChatUseCase struct {
 
 type SocketBroadcaster interface {
 	BroadcastMessage(channelID string, message *models.ChatMessage)
+	BroadcastMessageSent(userID string, message *models.ChatMessage)
 	BroadcastTyping(channelID, userID string, isTyping bool)
 }
 

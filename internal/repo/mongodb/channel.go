@@ -81,9 +81,9 @@ func (r *channelRepo) GetUserChannels(ctx context.Context, userID string) ([]*mo
 		},
 		{
 			"$match": bson.M{
-				"members.user_id":  userID,
+				"members.user_id":   userID,
 				"members.is_active": true,
-				"is_archived":      false,
+				"is_archived":       false,
 			},
 		},
 		{
@@ -169,8 +169,19 @@ func (r *channelRepo) GetChannelsWithUnreadCount(ctx context.Context, userID str
 		},
 		{
 			"$project": bson.M{
-				"members":     0,
-				"unread_info": 0,
+				"id":                  "$_id",
+				"external_channel_id": 1,
+				"name":                1,
+				"item_name":           1,
+				"item_price":          1,
+				"context":             1,
+				"type":                1,
+				"created_at":          1,
+				"updated_at":          1,
+				"last_message_at":     1,
+				"is_archived":         1,
+				"unread_count":        1,
+				"_id":                 0, // Only _id can be excluded in an inclusion projection
 			},
 		},
 	}
@@ -347,9 +358,9 @@ func (r *unreadCountRepo) MarkAsRead(ctx context.Context, channelID primitive.Ob
 
 	update := bson.M{
 		"$set": bson.M{
-			"count":                  0,
-			"last_read_message_id":   lastReadMessageID,
-			"updated_at":             time.Now(),
+			"count":                0,
+			"last_read_message_id": lastReadMessageID,
+			"updated_at":           time.Now(),
 		},
 		"$setOnInsert": bson.M{
 			"channel_id": channelID,
