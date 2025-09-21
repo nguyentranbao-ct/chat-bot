@@ -1,0 +1,115 @@
+export interface User {
+  id: string;
+  name?: string;
+  email: string;
+  chotot_id?: string;
+  chotot_oid?: string;
+  chat_mode?: string;
+  created_at: string;
+  updated_at: string;
+  last_login_at?: string;
+  profile_setup_at?: string;
+  is_active: boolean;
+}
+
+export interface LoginRequest {
+  email: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: User;
+  expires_at: string;
+}
+
+export interface ProfileUpdateRequest {
+  name?: string;
+  chotot_id?: string;
+  chotot_oid?: string;
+  chat_mode?: string;
+}
+
+export interface Channel {
+  id: string;
+  external_channel_id: string;
+  name: string;
+  item_name?: string;
+  item_price?: string;
+  context?: string;
+  type: string;
+  created_at: string;
+  updated_at: string;
+  last_message_at?: string;
+  is_archived: boolean;
+  unread_count?: number;
+}
+
+export interface ChannelMember {
+  id: string;
+  channel_id: string;
+  user_id: string;
+  role: string;
+  joined_at: string;
+  left_at?: string;
+  is_active: boolean;
+}
+
+export interface MessageBlock {
+  type: string;
+  content: string;
+  style?: Record<string, any>;
+}
+
+export interface ChatMessage {
+  id: string;
+  channel_id: string;
+  external_channel_id: string;
+  sender_id: string;
+  message_type: string;
+  content: string;
+  blocks?: MessageBlock[];
+  created_at: string;
+  updated_at: string;
+  is_edited: boolean;
+  edited_at?: string;
+  is_deleted: boolean;
+  delivery_status: string;
+  metadata: {
+    source: string;
+    is_from_bot: boolean;
+    original_timestamp?: number;
+    custom_data?: Record<string, any>;
+  };
+}
+
+export interface SendMessageRequest {
+  content: string;
+  message_type?: string;
+  blocks?: MessageBlock[];
+  metadata?: Record<string, any>;
+}
+
+export interface MessageEvent {
+  id: string;
+  channel_id: string;
+  event_type: string;
+  message_id?: string;
+  user_id: string;
+  event_data: Record<string, any>;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface TypingIndicator {
+  channel_id: string;
+  user_id: string;
+  is_typing: boolean;
+}
+
+export interface SocketEvents {
+  message_sent: ChatMessage;
+  message_received: ChatMessage;
+  user_typing_start: TypingIndicator;
+  user_typing_stop: TypingIndicator;
+  channel_updated: Channel;
+}

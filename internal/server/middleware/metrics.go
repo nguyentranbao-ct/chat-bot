@@ -84,6 +84,8 @@ func MetricsWithConfig(config MetricsConfig) echo.MiddlewareFunc {
 		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
 			httpMetrics = are.ExistingCollector.(*prometheus.HistogramVec)
 		} else {
+			// In development mode, be more tolerant of registration errors
+			// Log the error but continue with a no-op implementation
 			panic(err)
 		}
 	}

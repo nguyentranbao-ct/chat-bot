@@ -32,6 +32,9 @@ tidy:
 dev:
 	go run .
 
+web-dev:
+	cd web && npm start
+
 # Install development tools
 install-tools:
 	@echo "Installing development tools..."
@@ -50,3 +53,4 @@ db-down:
 # Full development setup
 setup: tidy install-tools
 	@echo "Development environment setup complete!"
+

@@ -7,11 +7,17 @@ import (
 )
 
 type User struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	Name      string             `bson:"name" json:"name" validate:"required"`
-	Email     string             `bson:"email" json:"email" validate:"required,email"`
-	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time          `bson:"updated_at" json:"updated_at"`
+	ID             primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Name           string             `bson:"name" json:"name"`
+	Email          string             `bson:"email" json:"email" validate:"required,email"`
+	ChototID       string             `bson:"chotot_id" json:"chotot_id"`
+	ChototOID      string             `bson:"chotot_oid" json:"chotot_oid"`
+	ChatMode       string             `bson:"chat_mode" json:"chat_mode"`
+	IsActive       bool               `bson:"is_active" json:"is_active"`
+	LastLoginAt    *time.Time         `bson:"last_login_at" json:"last_login_at"`
+	ProfileSetupAt *time.Time         `bson:"profile_setup_at" json:"profile_setup_at"`
+	CreatedAt      time.Time          `bson:"created_at" json:"created_at"`
+	UpdatedAt      time.Time          `bson:"updated_at" json:"updated_at"`
 }
 
 type UserAttribute struct {

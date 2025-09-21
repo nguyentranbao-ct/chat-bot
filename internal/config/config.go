@@ -10,6 +10,7 @@ type Config struct {
 	ChatAPI  ChatAPIConfig  `envPrefix:"CHAT_API_"`
 	LLM      LLMConfig      `envPrefix:"LLM_"`
 	Kafka    KafkaConfig    `envPrefix:"KAFKA_"`
+	JWT      JWTConfig      `envPrefix:"JWT_"`
 }
 
 type ServerConfig struct {
@@ -44,6 +45,10 @@ type KafkaConfig struct {
 	Topic     string   `env:"TOPIC" envDefault:"chat.event.messages"`
 	GroupID   string   `env:"GROUP_ID" envDefault:"chat-bot-consumers"`
 	Whitelist []string `env:"SELLER_WHITELIST" envDefault:"11198316,11356173,11296497,all"`
+}
+
+type JWTConfig struct {
+	Secret string `env:"SECRET" envDefault:"your-jwt-secret-key-change-this-in-production"`
 }
 
 func Load() (*Config, error) {

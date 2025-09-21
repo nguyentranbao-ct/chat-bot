@@ -19,7 +19,12 @@ func StartConsumeMessages(
 	lc fx.Lifecycle,
 	conf *config.Config,
 	messageUsecase usecase.MessageUsecase,
+	chatUsecase *usecase.ChatUseCase,
 ) error {
+	if !conf.Kafka.Enabled {
+		log.Warnf(context.Background(), "Kafka consumer is disabled in configuration")
+		return nil
+	}
 	return startKafkaConsumer(consumerOptions{
 		sd: sd,
 		lc: lc,
@@ -51,7 +56,17 @@ func StartConsumeMessages(
 				return nil
 			}
 
-			// Convert to internal IncomingMessage format
+			log.Infow(ctx, "Processing Kafka message",
+				"channel_id", kafkaMessage.Data.ChannelID,
+				"sender_id", kafkaMessage.Data.SenderID)
+
+			// First, sync the message to our chat database
+			if err := chatUsecase.ProcessIncomingMessage(ctx, kafkaMessage.Data); err != nil {
+				log.Errorw(ctx, "Failed to sync message to chat database", "error", err)
+				// Continue processing for LLM even if chat sync fails
+			}
+
+			// Then process with LLM if needed (existing logic)
 			incomingMessage := models.IncomingMessage{
 				ChannelID: kafkaMessage.Data.ChannelID,
 				CreatedAt: kafkaMessage.Data.CreatedAt,
@@ -61,12 +76,8 @@ func StartConsumeMessages(
 					LLM: models.LLMMetadata{
 						ChatMode: "sales_assistant",
 					},
-				}, // Initialize with empty metadata for now
+				},
 			}
-
-			log.Infow(ctx, "Processing Kafka message",
-				"channel_id", incomingMessage.ChannelID,
-				"sender_id", incomingMessage.SenderID)
 
 			return messageUsecase.ProcessMessage(ctx, incomingMessage)
 		},

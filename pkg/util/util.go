@@ -131,14 +131,14 @@ func GetHistogramVec(name string, labels ...string) (*prometheus.HistogramVec, e
 		},
 	}, labels)
 	if err := prometheus.Register(metrics); err != nil {
-		var registeredErr *prometheus.AlreadyRegisteredError
+		var registeredErr prometheus.AlreadyRegisteredError
 		if ok := errors.As(err, &registeredErr); ok {
 			metrics, ok := registeredErr.ExistingCollector.(*prometheus.HistogramVec)
 			if ok {
 				return metrics, nil
 			}
 		}
-		return nil, fmt.Errorf("register: %w", err)
+		return nil, fmt.Errorf("register: %w %T", err, err)
 	}
 
 	return metrics, nil

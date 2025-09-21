@@ -108,9 +108,11 @@ func (w *kafkaConsumer) Start(ctx context.Context) error {
 				"value", json.RawMessage(msg.Value),
 				logger.Error(err),
 			)
-			w.metrics.
-				WithLabelValues(code.String(), msg.Topic, groupID).
-				Observe(duration.Seconds())
+			if w.metrics != nil {
+				w.metrics.
+					WithLabelValues(code.String(), msg.Topic, groupID).
+					Observe(duration.Seconds())
+			}
 		})
 	}
 	return nil

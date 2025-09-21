@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
 	pkgmdw "github.com/nguyentranbao-ct/chat-bot/internal/server/middleware"
+	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
 	"go.uber.org/fx"
 )
 
@@ -19,6 +20,10 @@ func StartServer(
 	sd fx.Shutdowner,
 	conf *config.Config,
 	handler Controller,
+	authController AuthController,
+	chatController ChatController,
+	authUsecase *usecase.AuthUseCase,
+	socketHandler *SocketHandler,
 ) {
 	e := echo.New()
 	e.Validator = pkgmdw.NewValidator()
@@ -53,12 +58,41 @@ func StartServer(
 		},
 	}))
 
+	// CORS middleware to allow web frontend access
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"http://localhost:3000", "http://127.0.0.1:3000"},
+		AllowMethods: []string{echo.GET, echo.PUT, echo.POST, echo.DELETE, echo.OPTIONS},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
+		AllowCredentials: true,
+	}))
+
 	e.GET("/health", handler.Health)
 
 	api := e.Group("/api/v1")
 	api.POST("/messages", handler.ProcessMessage)
 
-	// User management routes
+	// Authentication routes (no auth required)
+	api.POST("/auth/login", authController.Login)
+
+	// Protected routes
+	authMiddleware := pkgmdw.JWTAuth(authUsecase)
+
+	// User profile routes
+	api.GET("/auth/me", authController.GetProfile, authMiddleware)
+	api.PUT("/auth/profile", authController.UpdateProfile, authMiddleware)
+	api.POST("/auth/logout", authController.Logout, authMiddleware)
+
+	// Chat routes
+	chatGroup := api.Group("/chat", authMiddleware)
+	chatGroup.GET("/channels", chatController.GetChannels)
+	chatGroup.GET("/channels/:id/members", chatController.GetChannelMembers)
+	chatGroup.POST("/channels/:id/messages", chatController.SendMessage)
+	chatGroup.GET("/channels/:id/messages", chatController.GetChannelMessages)
+	chatGroup.GET("/channels/:id/events", chatController.GetChannelEvents)
+	chatGroup.POST("/channels/:id/read", chatController.MarkAsRead)
+	chatGroup.POST("/channels/:id/typing", chatController.SetTyping)
+
+	// User management routes (keeping for backward compatibility)
 	api.POST("/users", handler.CreateUser)
 	api.GET("/users/:id", handler.GetUser)
 	api.PUT("/users/:id", handler.UpdateUser)
@@ -69,6 +103,9 @@ func StartServer(
 	api.GET("/users/:id/attributes", handler.GetUserAttributes)
 	api.GET("/users/:id/attributes/:key", handler.GetUserAttributeByKey)
 	api.DELETE("/users/:id/attributes/:key", handler.RemoveUserAttribute)
+
+	// Socket.IO integration
+	e.Any("/socket.io/*", socketHandler.Handler())
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
