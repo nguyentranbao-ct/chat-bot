@@ -44,14 +44,15 @@ type ChatActivity struct {
 }
 
 type PurchaseIntent struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	SessionID primitive.ObjectID `bson:"session_id" json:"session_id"`
-	ChannelID string             `bson:"channel_id" json:"channel_id"`
-	UserID    string             `bson:"user_id" json:"user_id"`
-	ItemName  string             `bson:"item_name" json:"item_name"`
-	ItemPrice string             `bson:"item_price" json:"item_price"`
-	Intent    string             `bson:"intent" json:"intent"`
-	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
+	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	SessionID  primitive.ObjectID `bson:"session_id" json:"session_id"`
+	ChannelID  string             `bson:"channel_id" json:"channel_id"`
+	UserID     string             `bson:"user_id" json:"user_id"`
+	ItemName   string             `bson:"item_name" json:"item_name"`
+	ItemPrice  string             `bson:"item_price" json:"item_price"`
+	Intent     string             `bson:"intent" json:"intent"`
+	Percentage int                `bson:"percentage" json:"percentage"`
+	CreatedAt  time.Time          `bson:"created_at" json:"created_at"`
 }
 
 type SessionStatus string
@@ -65,8 +66,8 @@ const (
 type ActivityAction string
 
 const (
-	ActivityTriggerBuy    ActivityAction = "trigger_buy"
-	ActivityReplyMessage  ActivityAction = "reply_message"
-	ActivityFetchMessages ActivityAction = "fetch_messages"
-	ActivityEndSession    ActivityAction = "end_session"
+	ActivityPurchaseIntent ActivityAction = "purchase_intent"
+	ActivityReplyMessage   ActivityAction = "reply_message"
+	ActivityFetchMessages  ActivityAction = "fetch_messages"
+	ActivityEndSession     ActivityAction = "end_session"
 )

@@ -13,8 +13,7 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port string `env:"PORT" envDefault:"8080"`
-	Host string `env:"HOST" envDefault:"0.0.0.0"`
+	Addr string `env:"ADDR" envDefault:"localhost:8080"`
 }
 
 type DatabaseConfig struct {
@@ -44,7 +43,7 @@ type KafkaConfig struct {
 	Brokers   []string `env:"BROKERS" envDefault:"kafka-08.ct.dev:9092"`
 	Topic     string   `env:"TOPIC" envDefault:"chat.event.messages"`
 	GroupID   string   `env:"GROUP_ID" envDefault:"chat-bot-consumers"`
-	Whitelist []string `env:"SELLER_WHITELIST" envDefault:"11198316,11356173"`
+	Whitelist []string `env:"SELLER_WHITELIST" envDefault:"11198316,11356173,11296497,all"`
 }
 
 func Load() (*Config, error) {

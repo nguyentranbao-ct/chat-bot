@@ -12,10 +12,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func PanicOnErr(err error, msg string) {
-	if err != nil {
-		panic(fmt.Sprintf("%s: %v", msg, err))
+func PanicOnError(msg string, err ...error) error {
+	for _, e := range err {
+		if e != nil {
+			return fmt.Errorf("%s: %v", msg, e)
+		}
 	}
+	return nil
 }
 
 func ConvertListE[A any, B any](listA []A, convert func(A) (B, error)) ([]B, error) {

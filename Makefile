@@ -30,7 +30,7 @@ tidy:
 
 # Run the application
 dev:
-	go run ./cmd/server
+	go run .
 
 # Install development tools
 install-tools:

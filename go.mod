@@ -5,19 +5,31 @@ go 1.25.0
 require (
 	github.com/caarlos0/env/v11 v11.3.1
 	github.com/carousell/chat-api v0.0.0-20250918074315-52169473979d
+	github.com/carousell/ct-communication-notification-worker v0.0.0-20250521073105-be9dbb759b85
+	github.com/carousell/ct-go/pkg/httpclient v0.12.0
+	github.com/carousell/ct-go/pkg/httputils v0.3.0
+	github.com/carousell/ct-go/pkg/json v0.3.3
 	github.com/carousell/ct-go/pkg/logger v0.9.8
 	github.com/carousell/ct-go/pkg/workerpool v0.2.1
+	github.com/cstockton/go-conv v1.0.0
 	github.com/firebase/genkit/go v1.0.4
 	github.com/go-playground/validator/v10 v10.27.0
 	github.com/go-resty/resty/v2 v2.16.5
+	github.com/goccy/go-json v0.10.5
+	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/prometheus/client_golang v1.23.2
 	github.com/segmentio/kafka-go v0.4.49
+	github.com/spf13/cast v1.10.0
+	github.com/spf13/cobra v1.8.0
+	github.com/stretchr/testify v1.11.1
+	github.com/tidwall/gjson v1.18.0
 	go.mongodb.org/mongo-driver v1.17.4
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.73.0
+	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -28,9 +40,8 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/carousell/ct-go/pkg/httpclient v0.8.1 // indirect
-	github.com/carousell/ct-go/pkg/json v0.3.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.10 // indirect
@@ -40,7 +51,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/goccy/go-yaml v1.17.1 // indirect
 	github.com/gocql/gocql v1.2.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -53,6 +63,7 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
@@ -64,6 +75,7 @@ require (
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.17.0 // indirect
@@ -72,6 +84,9 @@ require (
 	github.com/scylladb/go-set v1.0.2 // indirect
 	github.com/scylladb/gocqlx/v2 v2.4.0 // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect

@@ -2,30 +2,29 @@ package app
 
 import (
 	"context"
-	"fmt"
-	"net/http"
-	"time"
 
 	"github.com/carousell/ct-go/pkg/logger"
-	"github.com/labstack/echo/v4"
+	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
-	"github.com/nguyentranbao-ct/chat-bot/internal/kafka"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repo/llm"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/end_session"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/fetch_messages"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/purchase_intent"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/reply_message"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
 	"github.com/nguyentranbao-ct/chat-bot/internal/server"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap/zapcore"
 )
 
-func NewApp() *fx.App {
+func Invoke(funcs ...any) *fx.App {
 	log := logger.MustNamed("app")
 	conf := config.MustLoad()
-	log.Infow("Configuration loaded", log.Reflect("config", conf))
+	log.Debugw("config loaded", log.Reflect("config", conf))
 	return fx.New(
 		fx.WithLogger(func() fxevent.Logger {
 			l := &fxevent.ZapLogger{
@@ -34,182 +33,36 @@ func NewApp() *fx.App {
 			l.UseLogLevel(zapcore.DebugLevel)
 			return l
 		}),
-		fx.Supply(conf),
 		fx.Provide(
-			NewKafkaConfig,
-			NewMongoDB,
-			NewRepositories,
+			newGenkitClient,
+			newMongoDB,
+
+			server.NewHandler,
+
+			usecase.NewLLMUsecase,
+			usecase.NewMessageUsecase,
+			usecase.NewWhitelistService,
+
+			mongodb.NewChatActivityRepository,
+			mongodb.NewChatModeRepository,
+			mongodb.NewChatSessionRepository,
+			mongodb.NewPurchaseIntentRepository,
 			chatapi.NewChatAPIClient,
-			NewToolsManager,
-			NewGenkitService,
-			NewMessageUsecase,
-			NewMessageHandler,
-			NewWhitelistService,
-			NewKafkaMessageHandler,
-			kafka.NewConsumer,
-			NewEchoServer,
-			NewChatModeInitializer,
+			toolsmanager.NewToolsManager,
+			end_session.NewTool,
+			purchase_intent.NewTool,
+			fetch_messages.NewTool,
+			reply_message.NewTool,
 		),
-		fx.Invoke(StartServer, StartKafkaConsumer, InitializeDefaultChatModes),
+		fx.Supply(conf),
+		fx.Invoke(funcs...),
 	)
 }
 
-type Repositories struct {
-	ChatMode       mongodb.ChatModeRepository
-	Session        mongodb.ChatSessionRepository
-	Activity       mongodb.ChatActivityRepository
-	PurchaseIntent mongodb.PurchaseIntentRepository
-}
-
-func NewKafkaConfig(cfg *config.Config) *config.KafkaConfig {
-	return &cfg.Kafka
-}
-
-func NewMongoDB(lc fx.Lifecycle, cfg *config.Config) (*mongodb.DB, error) {
-	opts := options.Client().
-		SetAppName("chat-bot").
-		SetDirect(cfg.Database.Direct).
-		SetHosts(cfg.Database.Hosts)
-
-	if cfg.Database.Username != "" {
-		opts.SetAuth(options.Credential{
-			Username:      cfg.Database.Username,
-			Password:      cfg.Database.Password,
-			AuthSource:    cfg.Database.AuthDB,
-			AuthMechanism: "SCRAM-SHA-1",
-		})
+func newGenkitClient(cfg *config.Config) (*genkit.Genkit, error) {
+	ctx := context.Background()
+	googleAI := &googlegenai.GoogleAI{
+		APIKey: cfg.LLM.GoogleAIAPIKey,
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	mongoClient, err := mongo.Connect(ctx, opts)
-	if err != nil {
-		return nil, fmt.Errorf("init mongo client: %w", err)
-	}
-
-	mongoDB := mongoClient.Database(cfg.Database.Database)
-
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			return mongoClient.Ping(ctx, nil)
-		},
-		OnStop: func(ctx context.Context) error {
-			return mongoClient.Disconnect(ctx)
-		},
-	})
-
-	return &mongodb.DB{
-		Client:   mongoClient,
-		Database: mongoDB,
-	}, nil
-}
-
-func NewRepositories(db *mongodb.DB) *Repositories {
-	return &Repositories{
-		ChatMode:       mongodb.NewChatModeRepository(db),
-		Session:        mongodb.NewChatSessionRepository(db),
-		Activity:       mongodb.NewChatActivityRepository(db),
-		PurchaseIntent: mongodb.NewPurchaseIntentRepository(db),
-	}
-}
-
-func NewToolsManager(
-	chatAPIClient chatapi.Client,
-	repos *Repositories,
-) *llm.ToolsManager {
-	return llm.NewToolsManager(
-		chatAPIClient,
-		repos.Session,
-		repos.Activity,
-		repos.PurchaseIntent,
-	)
-}
-
-func NewGenkitService(cfg *config.Config, toolsManager *llm.ToolsManager) (llm.Service, error) {
-	return llm.NewGenkitService(cfg, toolsManager)
-}
-
-func NewMessageUsecase(
-	repos *Repositories,
-	chatAPIClient chatapi.Client,
-	genkitService llm.Service,
-	whitelistService usecase.WhitelistService,
-) usecase.MessageUsecase {
-	return usecase.NewMessageUsecase(
-		repos.ChatMode,
-		repos.Session,
-		repos.Activity,
-		chatAPIClient,
-		genkitService,
-		whitelistService,
-	)
-}
-
-func NewMessageHandler(messageUsecase usecase.MessageUsecase) server.Handler {
-	return server.NewHandler(messageUsecase)
-}
-
-func NewEchoServer(messageHandler server.Handler) *echo.Echo {
-	e := echo.New()
-	server.SetupMiddleware(e)
-	server.SetupRoutes(e, messageHandler)
-	return e
-}
-
-func NewWhitelistService(cfg *config.Config) usecase.WhitelistService {
-	return usecase.NewWhitelistService(&cfg.Kafka)
-}
-
-func NewChatModeInitializer(repos *Repositories) usecase.ChatModeInitializer {
-	return usecase.NewChatModeInitializer(repos.ChatMode)
-}
-
-func NewKafkaMessageHandler(messageUsecase usecase.MessageUsecase) kafka.MessageHandler {
-	return kafka.NewMessageHandler(messageUsecase)
-}
-
-func StartServer(lc fx.Lifecycle, e *echo.Echo, cfg *config.Config) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			go func() {
-				addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
-				if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
-					panic(fmt.Sprintf("Failed to start server: %v", err))
-				}
-			}()
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			return e.Shutdown(ctx)
-		},
-	})
-}
-
-func StartKafkaConsumer(lc fx.Lifecycle, consumer kafka.Consumer) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			go func() {
-				if err := consumer.Start(ctx); err != nil {
-					panic(fmt.Sprintf("Failed to start Kafka consumer: %v", err))
-				}
-			}()
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			return consumer.Stop(ctx)
-		},
-	})
-}
-
-func InitializeDefaultChatModes(lc fx.Lifecycle, initializer usecase.ChatModeInitializer) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			if err := initializer.InitializeDefaultChatModes(ctx); err != nil {
-				log := logger.MustNamed("app")
-				log.Error("Failed to initialize default chat modes", "error", err)
-				// Don't fail the application startup for this optional feature
-			}
-			return nil
-		},
-	})
+	return genkit.Init(ctx, genkit.WithPlugins(googleAI)), nil
 }

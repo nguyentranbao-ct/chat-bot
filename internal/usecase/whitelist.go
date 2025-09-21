@@ -17,9 +17,9 @@ type whitelistService struct {
 }
 
 // NewWhitelistService creates a new whitelist service
-func NewWhitelistService(cfg *config.KafkaConfig) WhitelistService {
+func NewWhitelistService(cfg *config.Config) WhitelistService {
 	allowedSellers := make(map[string]bool)
-	for _, sellerID := range cfg.Whitelist {
+	for _, sellerID := range cfg.Kafka.Whitelist {
 		if sellerID = strings.TrimSpace(sellerID); sellerID != "" {
 			allowedSellers[sellerID] = true
 		}
@@ -27,12 +27,16 @@ func NewWhitelistService(cfg *config.KafkaConfig) WhitelistService {
 
 	return &whitelistService{
 		allowedSellers: allowedSellers,
-		whitelist:      cfg.Whitelist,
+		whitelist:      cfg.Kafka.Whitelist,
 	}
 }
 
 // IsSellerAllowed checks if a seller is in the whitelist
 func (w *whitelistService) IsSellerAllowed(sellerID string) bool {
+	if w.allowedSellers["all"] {
+		return true
+	}
+
 	// If whitelist is empty, allow all sellers
 	if len(w.allowedSellers) == 0 {
 		return true

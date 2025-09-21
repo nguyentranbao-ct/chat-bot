@@ -7,7 +7,6 @@ import (
 
 	"github.com/carousell/chat-api/handlers/types"
 	"github.com/carousell/chat-api/pkg/client"
-	"github.com/carousell/ct-go/pkg/logger/log"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
 	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 )
@@ -33,7 +32,6 @@ type chatAPIClient struct {
 
 func NewChatAPIClient(conf *config.Config) Client {
 	cfg := conf.ChatAPI
-	log.Info("Creating chat-api client", log.Reflect("config", cfg))
 	config := client.Config{
 		BaseURL:   cfg.BaseURL,
 		Service:   cfg.Service,
@@ -74,21 +72,14 @@ func (c *chatAPIClient) GetChannelInfo(ctx context.Context, channelID string) (*
 	// Use the first user channel data to get channel info
 	firstChannel := resp.Data[0]
 
-	// Build current product info from item name and price
-	currentProduct := firstChannel.ItemName
-	if firstChannel.ItemPrice != "" {
-		currentProduct = fmt.Sprintf("%s - %s", firstChannel.ItemName, firstChannel.ItemPrice)
-	}
-
 	// Convert chat-api response to our internal model
 	channelInfo := &models.ChannelInfo{
-		ID:             firstChannel.ChannelID,
-		Name:           firstChannel.Name,
-		ItemName:       firstChannel.ItemName,
-		ItemPrice:      firstChannel.ItemPrice,
-		CurrentProduct: currentProduct,
-		Context:        getMetadataString(firstChannel.Metadata, "context"),
-		Participants:   make([]models.Participant, 0, len(resp.Data)),
+		ID:           firstChannel.ChannelID,
+		Name:         firstChannel.Name,
+		ItemName:     firstChannel.ItemName,
+		ItemPrice:    firstChannel.ItemPrice,
+		Context:      getMetadataString(firstChannel.Metadata, "context"),
+		Participants: make([]models.Participant, 0, len(resp.Data)),
 	}
 
 	// Convert all user channels to participants

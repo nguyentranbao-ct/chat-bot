@@ -57,7 +57,7 @@ Implement a Go-based chat-bot service that acts as an AI-powered seller in produ
    - Token limits and iteration controls
 
 8. **Tool system implementation**
-   - `TriggerBuy`: Purchase intent logging
+   - `PurchaseIntent`: Purchase intent logging
    - `ReplyMessage`: Send messages via chat-api
    - `FetchMessages`: Retrieve conversation history
    - `EndSession`: Terminate AI flow

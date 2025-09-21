@@ -7,13 +7,12 @@ import (
 
 	log "github.com/carousell/ct-go/pkg/logger/log_context"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repo/llm"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 	"github.com/nguyentranbao-ct/chat-bot/pkg/models"
 )
 
 type MessageUsecase interface {
-	ProcessMessage(ctx context.Context, message *models.IncomingMessage) error
+	ProcessMessage(ctx context.Context, message models.IncomingMessage) error
 }
 
 type messageUsecase struct {
@@ -21,7 +20,7 @@ type messageUsecase struct {
 	sessionRepo      mongodb.ChatSessionRepository
 	activityRepo     mongodb.ChatActivityRepository
 	chatAPIClient    chatapi.Client
-	genkitService    llm.Service
+	llmUsecase       LLMUsecase
 	whitelistService WhitelistService
 }
 
@@ -30,7 +29,7 @@ func NewMessageUsecase(
 	sessionRepo mongodb.ChatSessionRepository,
 	activityRepo mongodb.ChatActivityRepository,
 	chatAPIClient chatapi.Client,
-	genkitService llm.Service,
+	llmUsecase LLMUsecase,
 	whitelistService WhitelistService,
 ) MessageUsecase {
 	return &messageUsecase{
@@ -38,12 +37,12 @@ func NewMessageUsecase(
 		sessionRepo:      sessionRepo,
 		activityRepo:     activityRepo,
 		chatAPIClient:    chatAPIClient,
-		genkitService:    genkitService,
+		llmUsecase:       llmUsecase,
 		whitelistService: whitelistService,
 	}
 }
 
-func (uc *messageUsecase) ProcessMessage(ctx context.Context, message *models.IncomingMessage) error {
+func (uc *messageUsecase) ProcessMessage(ctx context.Context, message models.IncomingMessage) error {
 	log.Infof(ctx, "Processing message from user %s in channel %s", message.SenderID, message.ChannelID)
 
 	// Get channel info first to check seller whitelist
@@ -86,7 +85,7 @@ func (uc *messageUsecase) ProcessMessage(ctx context.Context, message *models.In
 		recentMessages = &models.MessageHistory{Messages: []models.HistoryMessage{}}
 	}
 
-	promptData := &llm.PromptData{
+	promptData := &PromptData{
 		ChannelInfo:    channelInfo,
 		SessionID:      session.ID.Hex(),
 		UserID:         message.SenderID,
@@ -95,7 +94,7 @@ func (uc *messageUsecase) ProcessMessage(ctx context.Context, message *models.In
 		RecentMessages: recentMessages,
 	}
 
-	if err := uc.genkitService.ProcessMessage(ctx, chatMode, promptData); err != nil {
+	if err := uc.llmUsecase.ProcessMessage(ctx, chatMode, promptData); err != nil {
 		return fmt.Errorf("failed to process with Genkit: %w", err)
 	}
 
@@ -103,7 +102,7 @@ func (uc *messageUsecase) ProcessMessage(ctx context.Context, message *models.In
 	return nil
 }
 
-func (uc *messageUsecase) newSession(ctx context.Context, message *models.IncomingMessage, chatMode *models.ChatMode) (*models.ChatSession, error) {
+func (uc *messageUsecase) newSession(ctx context.Context, message models.IncomingMessage, chatMode *models.ChatMode) (*models.ChatSession, error) {
 	session := &models.ChatSession{
 		ChannelID: message.ChannelID,
 		UserID:    message.SenderID,
@@ -147,7 +146,6 @@ func findSellerIDFromChannel(channelInfo *models.ChannelInfo) string {
 	}
 	return ""
 }
-
 
 func (uc *messageUsecase) fetchRecentMessages(ctx context.Context, userID, channelID string) (*models.MessageHistory, error) {
 	req := chatapi.MessageHistoryRequest{

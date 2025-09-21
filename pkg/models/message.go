@@ -4,26 +4,26 @@ import "time"
 
 // KafkaMessage represents the top-level Kafka message structure
 type KafkaMessage struct {
-	Pattern string              `json:"pattern"`
-	Data    KafkaMessageData    `json:"data"`
+	Pattern string           `json:"pattern"`
+	Data    KafkaMessageData `json:"data"`
 }
 
 // KafkaMessageData represents the actual message data from Kafka
 type KafkaMessageData struct {
-	ChannelID                     string                 `json:"channel_id" validate:"required"`
-	SenderID                      string                 `json:"sender_id" validate:"required"`
-	CreatedAt                     int64                  `json:"created_at" validate:"required"`
-	Type                          string                 `json:"type"`
-	Message                       string                 `json:"message" validate:"required"`
-	FilterMsg                     *string                `json:"filter_msg"`
-	Metadata                      map[string]interface{} `json:"metadata"`
-	Attachment                    interface{}            `json:"attachment"`
-	ReceiverIDs                   []string               `json:"receiver_ids"`
-	ReceiverIDsForSpamMessage     []string               `json:"receiver_ids_for_spam_message"`
-	ClientGenID                   string                 `json:"client_gen_id"`
-	PreviousMessageCreatedAt      int64                  `json:"previous_message_created_at"`
-	NumberID                      int                    `json:"number_id"`
-	ClientMetadata                map[string]interface{} `json:"client_metadata"`
+	ChannelID                 string                 `json:"channel_id" validate:"required"`
+	SenderID                  string                 `json:"sender_id" validate:"required"`
+	CreatedAt                 int64                  `json:"created_at" validate:"required"`
+	Type                      string                 `json:"type"`
+	Message                   string                 `json:"message" validate:"required"`
+	FilterMsg                 *string                `json:"filter_msg"`
+	Metadata                  map[string]interface{} `json:"metadata"`
+	Attachment                interface{}            `json:"attachment"`
+	ReceiverIDs               []string               `json:"receiver_ids"`
+	ReceiverIDsForSpamMessage []string               `json:"receiver_ids_for_spam_message"`
+	ClientGenID               string                 `json:"client_gen_id"`
+	PreviousMessageCreatedAt  int64                  `json:"previous_message_created_at"`
+	NumberID                  int                    `json:"number_id"`
+	ClientMetadata            map[string]interface{} `json:"client_metadata"`
 }
 
 // IncomingMessage represents the simplified message structure for internal processing
@@ -50,13 +50,12 @@ type OutgoingMessage struct {
 }
 
 type ChannelInfo struct {
-	ID             string        `json:"id"`
-	Name           string        `json:"name"`
-	ItemName       string        `json:"item_name"`
-	ItemPrice      string        `json:"item_price"`
-	CurrentProduct string        `json:"current_product"`
-	Context        string        `json:"context"`
-	Participants   []Participant `json:"participants"`
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	ItemName     string        `json:"item_name"`
+	ItemPrice    string        `json:"item_price"`
+	Context      string        `json:"context"`
+	Participants []Participant `json:"participants"`
 }
 
 type Participant struct {

@@ -13,7 +13,7 @@ graph TB
     subgraph "Chat-Bot Service"
         CB[Chat-Bot]
         CB --> CBDB[MongoDB<br/>modes, sessions, activities]
-        CB --> TOOLS[Tools Provider<br/>TriggerBuy, ReplyMessage, FetchMessages, EndSession]
+        CB --> TOOLS[Tools Provider<br/>PurchaseIntent, ReplyMessage, FetchMessages, EndSession]
     end
 
     subgraph "External Services"
@@ -64,7 +64,7 @@ flowchart TD
 ## Components
 
 - **Chat Modes:** Configurable YAML with templates for customization.
-- **Tools:** TriggerBuy (log), ReplyMessage (API call), FetchMessages (API call), EndSession (terminate).
+- **Tools:** PurchaseIntent (log), ReplyMessage (API call), FetchMessages (API call), EndSession (terminate).
 - **AI Flow:** Iterative LLM calls with tool execution.
 - **Validation:** Project ID, mode existence, metadata presence.
 
