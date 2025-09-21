@@ -1,12 +1,20 @@
 ---
 - user_email: 'test@example.com'
   key: 'chotot_id'
-  value: '123456'
+  value: 'test_seller_123'
   tags: ['chotot', 'link_id']
+- user_email: 'test@example.com'
+  key: 'chotot_oid'
+  value: '123456'
+  tags: ['chotot', 'account_oid']
 - user_email: 'demo@example.com'
   key: 'chotot_id'
-  value: '789012'
+  value: 'demo_seller_456'
   tags: ['chotot', 'link_id']
+- user_email: 'demo@example.com'
+  key: 'chotot_oid'
+  value: '789012'
+  tags: ['chotot', 'account_oid']
 - user_email: 'test@example.com'
   key: 'facebook_id'
   value: 'fb_test_123'

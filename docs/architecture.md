@@ -119,6 +119,7 @@ flowchart TD
 The system implements a clean architecture with strict separation of concerns:
 
 **Import Hierarchy (Top to Bottom):**
+
 ```
 cmd/ (CLI entry point)
 ├── internal/app/ (Dependency injection & app lifecycle)

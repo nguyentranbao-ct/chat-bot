@@ -21,9 +21,8 @@ const (
 
 // ListProductsInput defines the input arguments for the ListProducts tool
 type ListProductsInput struct {
-	UserID string `json:"user_id"`
-	Limit  int    `json:"limit,omitempty"`
-	Page   int    `json:"page,omitempty"`
+	Limit int `json:"limit,omitempty"`
+	Page  int `json:"page,omitempty"`
 }
 
 // ListProductsOutput defines the output of the ListProducts tool
@@ -85,62 +84,61 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 		input.Page = 1
 	}
 
-	// Get user by ID
-	userID, err := primitive.ObjectIDFromHex(input.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user ID: %w", err)
+	// Get seller ID from session context (this is the chotot_id)
+	sellerID := session.GetSenderID()
+	if sellerID == "" {
+		return nil, fmt.Errorf("no seller ID found in session context")
 	}
 
-	user, err := t.userRepo.GetByID(ctx, userID)
+	// Step 1: Map from chotot_id (seller ID) to internal user ID
+	// Find user attribute with key="chotot_id" and value=sellerID
+	chototIDAttrs, err := t.userAttributeRepo.GetByKey(ctx, "chotot_id")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
+		return nil, fmt.Errorf("failed to get chotot_id attributes: %w", err)
 	}
 
-	// Get user attributes with "link_id" tag to find linked services
-	linkAttrs, err := t.userAttributeRepo.GetByUserIDAndTags(ctx, userID, []string{"link_id"})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user link attributes: %w", err)
+	var internalUserID primitive.ObjectID
+	var found bool
+	for _, attr := range chototIDAttrs {
+		if attr.Value == sellerID {
+			internalUserID = attr.UserID
+			found = true
+			break
+		}
 	}
 
-	if len(linkAttrs) == 0 {
-		log.Infow(ctx, "No linked services found for user", "user_id", input.UserID)
+	if !found {
+		log.Infow(ctx, "No internal user found for chotot_id", "chotot_id", sellerID)
 		return &ListProductsOutput{
 			Products: []Product{},
 			Total:    0,
 		}, nil
 	}
 
-	// Aggregate products from all linked services
-	var allProducts []Product
-	totalCount := 0
+	// Step 2: Get the chotot_oid attribute for this internal user
+	chototOIDAttr, err := t.userAttributeRepo.GetByUserIDAndKey(ctx, internalUserID, "chotot_oid")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chotot_oid attribute: %w", err)
+	}
 
-	for _, attr := range linkAttrs {
-		// Determine service type from tags
-		serviceType := t.determineServiceType(attr.Tags)
-		if serviceType == "" {
-			log.Warnw(ctx, "Unable to determine service type", "tags", attr.Tags)
-			continue
-		}
+	if chototOIDAttr == nil {
+		log.Infow(ctx, "No chotot_oid found for internal user", "internal_user_id", internalUserID.Hex())
+		return &ListProductsOutput{
+			Products: []Product{},
+			Total:    0,
+		}, nil
+	}
 
-		// Get product service for this type
-		service, exists := t.serviceRegistry.GetService(serviceType)
-		if !exists {
-			log.Warnw(ctx, "No product service registered", "service_type", serviceType)
-			continue
-		}
+	// Get Chotot product service
+	service, exists := t.serviceRegistry.GetService("chotot")
+	if !exists {
+		return nil, fmt.Errorf("chotot product service not registered")
+	}
 
-		// Fetch products from this service
-		products, total, err := service.ListUserProducts(ctx, attr.Value, input.Limit, input.Page)
-		if err != nil {
-			log.Errorw(ctx, "Failed to fetch products from service",
-				"service_type", serviceType,
-				"user_external_id", attr.Value,
-				"error", err)
-			continue
-		}
-
-		allProducts = append(allProducts, products...)
-		totalCount += total
+	// Step 3: Fetch products from Chotot service using the chotot_oid value
+	products, total, err := service.ListUserProducts(ctx, chototOIDAttr.Value, input.Limit, input.Page)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch products from Chotot: %w", err)
 	}
 
 	// Log activity
@@ -149,15 +147,16 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 	}
 
 	output := &ListProductsOutput{
-		Products: allProducts,
-		Total:    totalCount,
+		Products: products,
+		Total:    total,
 	}
 
-	log.Infow(ctx, "Successfully fetched products",
-		"user_id", input.UserID,
-		"user_email", user.Email,
-		"products_count", len(allProducts),
-		"total_available", totalCount)
+	log.Infow(ctx, "Successfully fetched products from Chotot",
+		"chotot_id", sellerID,
+		"internal_user_id", internalUserID.Hex(),
+		"chotot_oid", chototOIDAttr.Value,
+		"products_count", len(products),
+		"total_available", total)
 
 	return output, nil
 }
@@ -190,16 +189,6 @@ func (t *tool) parseArgs(args interface{}, target interface{}) error {
 	return nil
 }
 
-// determineServiceType determines the service type from tags
-func (t *tool) determineServiceType(tags []string) string {
-	for _, tag := range tags {
-		if tag == "chotot" {
-			return "chotot"
-		}
-		// Add more service types as needed
-	}
-	return ""
-}
 
 // logActivity logs the tool execution activity
 func (t *tool) logActivity(ctx context.Context, input ListProductsInput, session toolsmanager.SessionContext) error {
