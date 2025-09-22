@@ -173,7 +173,7 @@ func (l *llmUsecase) validateInputs(ctx context.Context, chatMode *models.ChatMo
 		}
 	}
 
-	log.Infow(ctx, "Input validation passed", "chat_mode", chatMode.Name, "session_id", data.SessionID)
+	log.Debugw(ctx, "Input validation passed", "chat_mode", chatMode.Name, "session_id", data.SessionID)
 	return nil
 }
 
@@ -335,8 +335,6 @@ func (l *llmUsecase) generateResponse(session toolsmanager.SessionContext, chatM
 func (l *llmUsecase) executeToolRequests(ctx context.Context, toolRequests []*ai.ToolRequest, availableTools []ai.Tool, session toolsmanager.SessionContext) ([]*ai.Part, error) {
 	var toolResponseParts []*ai.Part
 	for _, req := range toolRequests {
-		log.Infow(ctx, "Executing tool", "tool_name", req.Name)
-
 		tool := l.findToolByName(req.Name, availableTools)
 		if tool == nil {
 			log.Errorw(ctx, "Tool not found", "tool_name", req.Name)
@@ -348,9 +346,6 @@ func (l *llmUsecase) executeToolRequests(ctx context.Context, toolRequests []*ai
 			log.Errorw(ctx, "Tool execution failed", "tool_name", req.Name, "error", err)
 			continue
 		}
-
-		log.Infow(ctx, "Tool executed successfully", "tool_name", req.Name)
-
 		toolResponseParts = append(toolResponseParts,
 			ai.NewToolResponsePart(&ai.ToolResponse{
 				Name:   req.Name,

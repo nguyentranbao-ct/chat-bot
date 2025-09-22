@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/carousell/ct-go/pkg/logger"
 	"github.com/firebase/genkit/go/genkit"
@@ -17,6 +18,7 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/purchase_intent"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/reply_message"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/vendors"
 	"github.com/nguyentranbao-ct/chat-bot/internal/server"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
 	"go.uber.org/fx"
@@ -69,12 +71,17 @@ func Invoke(funcs ...any) *fx.App {
 			mongodb.NewMessageEventRepository,
 			mongodb.NewTypingIndicatorRepository,
 			mongodb.NewUnreadCountRepository,
+			mongodb.NewMessageDedupRepository,
 
 			// External Clients
 			chatapi.NewChatAPIClient,
 			chotot.NewClient,
 			list_products.NewProductServiceRegistry,
 			socket.NewClient,
+
+			// Vendor System
+			vendors.NewVendorRegistry,
+			vendors.NewChototVendor,
 
 			// Tools Manager
 			toolsmanager.NewToolsManager,
@@ -90,6 +97,7 @@ func Invoke(funcs ...any) *fx.App {
 		fx.Invoke(initializeUsers),
 		fx.Invoke(initializeChannels),
 		fx.Invoke(initializeProductServices),
+		fx.Invoke(initializeVendors),
 		fx.Invoke(funcs...),
 	)
 }
@@ -150,6 +158,23 @@ func initializeChannels(
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			return usecase.AutoMigrateChannels(userRepo, channelRepo, channelMemberRepo, messageRepo)
+		},
+	})
+}
+
+// initializeVendors registers all vendor implementations with the registry
+func initializeVendors(
+	lc fx.Lifecycle,
+	registry *vendors.VendorRegistry,
+	chototVendor *vendors.ChototVendor,
+) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			// Register Chotot vendor
+			if err := registry.RegisterVendor(chototVendor); err != nil {
+				return fmt.Errorf("failed to register Chotot vendor: %w", err)
+			}
+			return nil
 		},
 	})
 }

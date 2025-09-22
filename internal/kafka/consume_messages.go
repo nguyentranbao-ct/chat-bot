@@ -52,34 +52,20 @@ func StartConsumeMessages(
 
 			// Only process message.sent events
 			if kafkaMessage.Pattern != "message.sent" {
-				log.Infow(ctx, "Ignoring non-message.sent event", "pattern", kafkaMessage.Pattern)
+				log.Debugw(ctx, "Ignoring non-message.sent event", "pattern", kafkaMessage.Pattern)
 				return nil
 			}
 
-			log.Infow(ctx, "Processing Kafka message",
+			log.Debugw(ctx, "Processing Kafka message",
 				"channel_id", kafkaMessage.Data.ChannelID,
 				"sender_id", kafkaMessage.Data.SenderID)
 
-			// First, sync the message to our chat database
-			if err := chatUsecase.ProcessIncomingMessage(ctx, kafkaMessage.Data); err != nil {
-				log.Errorw(ctx, "Failed to sync message to chat database", "error", err)
-				// Continue processing for LLM even if chat sync fails
-			}
+			// Transform Kafka message to our internal format with vendor detection
+			data := kafkaMessage.Data
 
-			// Then process with LLM if needed (existing logic)
-			incomingMessage := models.IncomingMessage{
-				ChannelID: kafkaMessage.Data.ChannelID,
-				CreatedAt: kafkaMessage.Data.CreatedAt,
-				SenderID:  kafkaMessage.Data.SenderID,
-				Message:   kafkaMessage.Data.Message,
-				Metadata: models.IncomingMessageMeta{
-					LLM: models.LLMMetadata{
-						ChatMode: "sales_assistant",
-					},
-				},
-			}
-
-			return messageUsecase.ProcessMessage(ctx, incomingMessage)
+			// Use ChatUseCase.ProcessIncomingMessage for message storage and socket events
+			// Skip LLM processing for Kafka messages
+			return chatUsecase.ProcessIncomingMessage(ctx, data)
 		},
 	})
 }

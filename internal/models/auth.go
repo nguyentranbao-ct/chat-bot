@@ -32,10 +32,7 @@ type LoginResponse struct {
 
 // ProfileUpdateRequest represents user profile update request
 type ProfileUpdateRequest struct {
-	Name      string `json:"name"`
-	ChototID  string `json:"chotot_id"`
-	ChototOID string `json:"chotot_oid"`
-	ChatMode  string `json:"chat_mode"`
+	Name string `json:"name"`
 }
 
 // JWTClaims represents the JWT token claims

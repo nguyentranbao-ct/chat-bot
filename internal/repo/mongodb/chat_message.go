@@ -15,6 +15,7 @@ import (
 
 type ChatMessageRepository interface {
 	Create(ctx context.Context, message *models.ChatMessage) error
+	Upsert(ctx context.Context, message *models.ChatMessage) error
 	GetByID(ctx context.Context, id primitive.ObjectID) (*models.ChatMessage, error)
 	GetChannelMessages(ctx context.Context, channelID primitive.ObjectID, limit int, before *primitive.ObjectID) ([]*models.ChatMessage, error)
 	GetByExternalMessageID(ctx context.Context, externalMessageID string) (*models.ChatMessage, error)
@@ -45,6 +46,69 @@ func (r *chatMessageRepo) Create(ctx context.Context, message *models.ChatMessag
 	if err != nil {
 		return fmt.Errorf("failed to create message: %w", err)
 	}
+	return nil
+}
+
+func (r *chatMessageRepo) Upsert(ctx context.Context, message *models.ChatMessage) error {
+	now := time.Now()
+
+	var filter bson.M
+	if !message.ID.IsZero() {
+		// Use ID if provided
+		filter = bson.M{"_id": message.ID}
+	} else if message.ExternalMessageID != "" {
+		// Use external message ID as fallback
+		filter = bson.M{"external_message_id": message.ExternalMessageID}
+	} else {
+		// If no ID provided, generate new one and insert
+		message.ID = primitive.NewObjectID()
+		message.CreatedAt = now
+		message.UpdatedAt = now
+		_, err := r.collection.InsertOne(ctx, message)
+		if err != nil {
+			return fmt.Errorf("failed to create message: %w", err)
+		}
+		return nil
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"channel_id":           message.ChannelID,
+			"sender_id":            message.SenderID,
+			"content":              message.Content,
+			"blocks":               message.Blocks,
+			"thread_id":            message.ThreadID,
+			"reply_to_message_id":  message.ReplyToMessageID,
+			"updated_at":           now,
+			"is_deleted":           message.IsDeleted,
+			"is_edited":            message.IsEdited,
+			"edited_at":            message.EditedAt,
+			"metadata":             message.Metadata,
+			"external_message_id":  message.ExternalMessageID,
+			"delivery_status":      message.DeliveryStatus,
+		},
+		"$setOnInsert": bson.M{
+			"created_at": now,
+		},
+	}
+
+	if message.ID.IsZero() {
+		update["$setOnInsert"].(bson.M)["_id"] = primitive.NewObjectID()
+	}
+
+	opts := options.Update().SetUpsert(true)
+	result, err := r.collection.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		return fmt.Errorf("failed to upsert message: %w", err)
+	}
+
+	// Set the ID if it was a new insert
+	if result.UpsertedID != nil {
+		if oid, ok := result.UpsertedID.(primitive.ObjectID); ok {
+			message.ID = oid
+		}
+	}
+
 	return nil
 }
 
@@ -237,7 +301,7 @@ func (r *chatMessageRepo) GetMessagesByTimeRange(ctx context.Context, channelID 
 
 type MessageEventRepository interface {
 	Create(ctx context.Context, event *models.MessageEvent) error
-	CreateEvent(ctx context.Context, channelID primitive.ObjectID, eventType string, messageID *primitive.ObjectID, userID string, eventData map[string]interface{}) error
+	CreateEvent(ctx context.Context, params CreateEventParams) error
 	GetChannelEvents(ctx context.Context, channelID primitive.ObjectID, sinceTime time.Time) ([]*models.MessageEvent, error)
 	CleanupExpiredEvents(ctx context.Context) error
 }
@@ -263,13 +327,22 @@ func (r *messageEventRepo) Create(ctx context.Context, event *models.MessageEven
 	return nil
 }
 
-func (r *messageEventRepo) CreateEvent(ctx context.Context, channelID primitive.ObjectID, eventType string, messageID *primitive.ObjectID, userID string, eventData map[string]interface{}) error {
+// CreateEventParams contains parameters for creating a message event
+type CreateEventParams struct {
+	ChannelID primitive.ObjectID      `json:"channel_id"`
+	EventType string                  `json:"event_type"`
+	MessageID *primitive.ObjectID     `json:"message_id,omitempty"`
+	UserID    string                  `json:"user_id"`
+	EventData map[string]interface{} `json:"event_data,omitempty"`
+}
+
+func (r *messageEventRepo) CreateEvent(ctx context.Context, params CreateEventParams) error {
 	event := &models.MessageEvent{
-		ChannelID: channelID,
-		EventType: eventType,
-		MessageID: messageID,
-		UserID:    userID,
-		EventData: eventData,
+		ChannelID: params.ChannelID,
+		EventType: params.EventType,
+		MessageID: params.MessageID,
+		UserID:    params.UserID,
+		EventData: params.EventData,
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(24 * time.Hour), // Events expire after 24 hours
 	}

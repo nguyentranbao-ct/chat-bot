@@ -37,7 +37,7 @@ func (tm *toolsManager) AddTool(tool Tool) error {
 	}
 
 	tm.tools[name] = tool
-	log.Infof(context.Background(), "Tool registered: %s - %s", name, tool.Description())
+	log.Debugw(context.Background(), "Tool registered: %s - %s", name, tool.Description())
 	return nil
 }
 
@@ -51,7 +51,7 @@ func (tm *toolsManager) ExecuteTool(ctx context.Context, toolName string, args i
 		return nil, fmt.Errorf("tool not found: %s", toolName)
 	}
 
-	log.Infow(ctx, "Executing tool", "tool_name", toolName)
+	log.Debugw(ctx, "Executing tool", "tool_name", toolName)
 
 	result, err := tool.Execute(ctx, args, session)
 	if err != nil {
@@ -59,7 +59,7 @@ func (tm *toolsManager) ExecuteTool(ctx context.Context, toolName string, args i
 		return nil, fmt.Errorf("tool execution failed: %w", err)
 	}
 
-	log.Infow(ctx, "Tool executed successfully", "tool_name", toolName)
+	log.Debugw(ctx, "Tool executed successfully", "tool_name", toolName)
 	return result, nil
 }
 

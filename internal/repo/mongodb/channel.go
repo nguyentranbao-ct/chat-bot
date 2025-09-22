@@ -16,7 +16,8 @@ import (
 type ChannelRepository interface {
 	Create(ctx context.Context, channel *models.Channel) error
 	GetByID(ctx context.Context, id primitive.ObjectID) (*models.Channel, error)
-	GetByExternalChannelID(ctx context.Context, externalChannelID string) (*models.Channel, error)
+	GetByVendorChannelID(ctx context.Context, vendorName, vendorChannelID string) (*models.Channel, error)
+	GetByExternalChannelID(ctx context.Context, externalChannelID string) (*models.Channel, error) // Deprecated: use GetByVendorChannelID
 	GetUserChannels(ctx context.Context, userID string) ([]*models.Channel, error)
 	UpdateLastMessage(ctx context.Context, channelID primitive.ObjectID) error
 	GetChannelsWithUnreadCount(ctx context.Context, userID string) ([]bson.M, error)
@@ -56,9 +57,36 @@ func (r *channelRepo) GetByID(ctx context.Context, id primitive.ObjectID) (*mode
 	return &channel, nil
 }
 
+// GetByVendorChannelID finds a channel by vendor name and vendor channel ID
+func (r *channelRepo) GetByVendorChannelID(ctx context.Context, vendorName, vendorChannelID string) (*models.Channel, error) {
+	var channel models.Channel
+	filter := bson.M{
+		"vendor.name":       vendorName,
+		"vendor.channel_id": vendorChannelID,
+	}
+	err := r.collection.FindOne(ctx, filter).Decode(&channel)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("channel not found")
+		}
+		return nil, fmt.Errorf("failed to get channel: %w", err)
+	}
+	return &channel, nil
+}
+
+// GetByExternalChannelID finds a channel by legacy external_channel_id (for backward compatibility)
+// Deprecated: use GetByVendorChannelID instead
 func (r *channelRepo) GetByExternalChannelID(ctx context.Context, externalChannelID string) (*models.Channel, error) {
 	var channel models.Channel
-	err := r.collection.FindOne(ctx, bson.M{"external_channel_id": externalChannelID}).Decode(&channel)
+	// First try the new vendor structure
+	filter := bson.M{"vendor.channel_id": externalChannelID}
+	err := r.collection.FindOne(ctx, filter).Decode(&channel)
+	if err == nil {
+		return &channel, nil
+	}
+
+	// Fallback to legacy field for channels not yet migrated
+	err = r.collection.FindOne(ctx, bson.M{"external_channel_id": externalChannelID}).Decode(&channel)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, fmt.Errorf("channel not found")
@@ -169,19 +197,18 @@ func (r *channelRepo) GetChannelsWithUnreadCount(ctx context.Context, userID str
 		},
 		{
 			"$project": bson.M{
-				"id":                  "$_id",
-				"external_channel_id": 1,
-				"name":                1,
-				"item_name":           1,
-				"item_price":          1,
-				"context":             1,
-				"type":                1,
-				"created_at":          1,
-				"updated_at":          1,
-				"last_message_at":     1,
-				"is_archived":         1,
-				"unread_count":        1,
-				"_id":                 0, // Only _id can be excluded in an inclusion projection
+				"id":                "$_id",
+				"vendor":             1,
+				"name":               1,
+				"metadata":           1,
+				"context":            1,
+				"type":               1,
+				"created_at":         1,
+				"updated_at":         1,
+				"last_message_at":    1,
+				"is_archived":        1,
+				"unread_count":       1,
+				"_id":                0, // Only _id can be excluded in an inclusion projection
 			},
 		},
 	}

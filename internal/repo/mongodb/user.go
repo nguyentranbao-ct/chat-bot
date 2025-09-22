@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type UserRepository interface {
@@ -16,6 +17,7 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id primitive.ObjectID) (*models.User, error)
 	GetByEmail(ctx context.Context, email string) (*models.User, error)
 	Update(ctx context.Context, user *models.User) error
+	Upsert(ctx context.Context, user *models.User) error
 	Delete(ctx context.Context, id primitive.ObjectID) error
 	List(ctx context.Context, limit, offset int) ([]*models.User, error)
 }
@@ -66,6 +68,7 @@ func (r *userRepo) GetByEmail(ctx context.Context, email string) (*models.User, 
 	return &user, nil
 }
 
+
 func (r *userRepo) Update(ctx context.Context, user *models.User) error {
 	user.UpdatedAt = time.Now()
 
@@ -75,6 +78,38 @@ func (r *userRepo) Update(ctx context.Context, user *models.User) error {
 	_, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
+	}
+	return nil
+}
+
+func (r *userRepo) Upsert(ctx context.Context, user *models.User) error {
+	now := time.Now()
+
+	var filter bson.M
+	if user.Email != "" {
+		// Use email as fallback identifier
+		filter = bson.M{"email": user.Email}
+	} else {
+		return fmt.Errorf("user must have either chotot_id or email for upsert")
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"name":        user.Name,
+			"email":       user.Email,
+			"is_active":   user.IsActive,
+			"is_internal": user.IsInternal,
+			"updated_at":  now,
+		},
+		"$setOnInsert": bson.M{
+			"_id":        primitive.NewObjectID(),
+			"created_at": now,
+		},
+	}
+
+	_, err := r.collection.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+	if err != nil {
+		return fmt.Errorf("failed to upsert user: %w", err)
 	}
 	return nil
 }

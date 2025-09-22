@@ -2,6 +2,7 @@ package util
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -142,4 +143,12 @@ func GetHistogramVec(name string, labels ...string) (*prometheus.HistogramVec, e
 	}
 
 	return metrics, nil
+}
+
+func NewTimeoutContext(ctx context.Context, timeout ...time.Duration) (context.Context, context.CancelFunc) {
+	duration := 10 * time.Second
+	if len(timeout) > 0 {
+		duration = timeout[0]
+	}
+	return context.WithTimeout(context.WithoutCancel(ctx), duration)
 }

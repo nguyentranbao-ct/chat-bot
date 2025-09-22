@@ -11,9 +11,9 @@
 
     CONTEXT INFORMATION:
     - Channel: {{.ChannelInfo.Name}}
-    {{-if .ChannelInfo.ItemName}}
+    {{ if .ChannelInfo.ItemName -}}
     - Product: {{.ChannelInfo.ItemName}} {{end}}{{if .ChannelInfo.ItemPrice}} (Price: {{.ChannelInfo.ItemPrice}})
-    {{-end}}
+    {{ end -}}
     - Available: YES
     - Condition: Still in good form
     - Current Message: "{{.Message}}"

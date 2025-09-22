@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"time"
 
@@ -76,7 +77,7 @@ func AutoMigrateUsers(userRepo mongodb.UserRepository, userAttrRepo mongodb.User
 	// Create users if they don't exist
 	for _, defaultUser := range defaultUsers {
 		existingUser, err := userRepo.GetByEmail(ctx, defaultUser.Email)
-		if err != nil {
+		if err != nil && !errors.Is(err, models.ErrNotFound) {
 			return fmt.Errorf("failed to check existing user: %w", err)
 		}
 
@@ -133,7 +134,7 @@ func AutoMigrateUsers(userRepo mongodb.UserRepository, userAttrRepo mongodb.User
 		if err := userAttrRepo.Upsert(ctx, attr); err != nil {
 			return fmt.Errorf("failed to upsert user attribute '%s' for user '%s': %w", defaultAttr.Key, defaultAttr.UserEmail, err)
 		}
-		log.Infow(ctx, "Created/updated default user attribute",
+		log.Debugw(ctx, "Created/updated default user attribute",
 			"user_email", defaultAttr.UserEmail,
 			"key", defaultAttr.Key,
 			"value", defaultAttr.Value)
@@ -167,15 +168,12 @@ func AutoMigrateChannels(userRepo mongodb.UserRepository, channelRepo mongodb.Ch
 
 			now := time.Now()
 			channel := &models.Channel{
-				ExternalChannelID: defaultChannel.ExternalChannelID,
-				Name:              defaultChannel.Name,
-				ItemName:          defaultChannel.ItemName,
-				ItemPrice:         defaultChannel.ItemPrice,
-				Context:           defaultChannel.Context,
-				Type:              defaultChannel.Type,
-				CreatedAt:         now,
-				UpdatedAt:         now,
-				IsArchived:        false,
+				Name:       defaultChannel.Name,
+				Context:    defaultChannel.Context,
+				Type:       defaultChannel.Type,
+				CreatedAt:  now,
+				UpdatedAt:  now,
+				IsArchived: false,
 			}
 
 			if err := channelRepo.Create(ctx, channel); err != nil {
@@ -227,16 +225,14 @@ func AutoMigrateChannels(userRepo mongodb.UserRepository, channelRepo mongodb.Ch
 
 		now := time.Now()
 		message := &models.ChatMessage{
-			ChannelID:         channel.ID,
-			ExternalChannelID: defaultMessage.ExternalChannelID,
-			SenderID:          defaultMessage.SenderID,
-			MessageType:       defaultMessage.MessageType,
-			Content:           defaultMessage.Content,
-			CreatedAt:         now,
-			UpdatedAt:         now,
-			IsEdited:          false,
-			IsDeleted:         false,
-			DeliveryStatus:    "delivered",
+			ChannelID:      channel.ID,
+			SenderID:       defaultMessage.SenderID,
+			Content:        defaultMessage.Content,
+			CreatedAt:      now,
+			UpdatedAt:      now,
+			IsEdited:       false,
+			IsDeleted:      false,
+			DeliveryStatus: "delivered",
 			Metadata: models.MessageMetadata{
 				Source:    "demo_data",
 				IsFromBot: defaultMessage.IsFromBot,

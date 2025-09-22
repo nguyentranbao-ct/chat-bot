@@ -96,7 +96,7 @@ func (uc *messageUsecase) ProcessMessage(ctx context.Context, message models.Inc
 		SessionID:      session.ID.Hex(),
 		UserID:         message.SenderID,
 		SenderRole:     senderRole,
-		Message:        message.Message,
+		Message:        message.Content,
 		RecentMessages: recentMessages,
 	}
 

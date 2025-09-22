@@ -50,7 +50,6 @@ func (uc *AuthUseCase) Login(ctx context.Context, req models.LoginRequest, userA
 
 	// Update last login time and ensure user is active
 	now := time.Now()
-	user.LastLoginAt = &now
 	user.UpdatedAt = now
 	user.IsActive = true // Ensure user is active on login
 	if err := uc.userRepo.Update(ctx, user); err != nil {
@@ -135,23 +134,8 @@ func (uc *AuthUseCase) UpdateProfile(ctx context.Context, userID primitive.Objec
 	if req.Name != "" {
 		user.Name = req.Name
 	}
-	if req.ChototID != "" {
-		user.ChototID = req.ChototID
-	}
-	if req.ChototOID != "" {
-		user.ChototOID = req.ChototOID
-	}
-	if req.ChatMode != "" {
-		user.ChatMode = req.ChatMode
-	}
 
 	user.UpdatedAt = time.Now()
-
-	// Set profile setup time if this is the first time setting profile info
-	if user.ProfileSetupAt == nil && (req.ChototID != "" || req.ChototOID != "" || req.ChatMode != "") {
-		now := time.Now()
-		user.ProfileSetupAt = &now
-	}
 
 	if err := uc.userRepo.Update(ctx, user); err != nil {
 		return nil, fmt.Errorf("failed to update user profile: %w", err)

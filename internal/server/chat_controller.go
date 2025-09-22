@@ -89,7 +89,15 @@ func (cc *chatController) SendMessage(c echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	message, err := cc.chatUsecase.SendMessage(ctx, channelID, user.Email, req.Content, req.MessageType, req.Blocks, req.Metadata)
+	params := usecase.SendMessageParams{
+		ChannelID:   channelID,
+		SenderID:    user.ID.Hex(),
+		Content:     req.Content,
+		MessageType: req.MessageType,
+		Blocks:      req.Blocks,
+		Metadata:    req.Metadata,
+	}
+	message, err := cc.chatUsecase.SendMessage(ctx, params)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}

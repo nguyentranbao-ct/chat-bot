@@ -18,6 +18,7 @@ type UserAttributeRepository interface {
 	GetByUserID(ctx context.Context, userID primitive.ObjectID) ([]*models.UserAttribute, error)
 	GetByUserIDAndKey(ctx context.Context, userID primitive.ObjectID, key string) (*models.UserAttribute, error)
 	GetByKey(ctx context.Context, key string) ([]*models.UserAttribute, error)
+	GetByKeyAndValue(ctx context.Context, key, value string) (*models.UserAttribute, error)
 	GetByTags(ctx context.Context, tags []string) ([]*models.UserAttribute, error)
 	GetByUserIDAndTags(ctx context.Context, userID primitive.ObjectID, tags []string) ([]*models.UserAttribute, error)
 	Update(ctx context.Context, attr *models.UserAttribute) error
@@ -119,6 +120,19 @@ func (r *userAttributeRepo) GetByKey(ctx context.Context, key string) ([]*models
 	}
 
 	return attrs, nil
+}
+
+func (r *userAttributeRepo) GetByKeyAndValue(ctx context.Context, key, value string) (*models.UserAttribute, error) {
+	var attr models.UserAttribute
+	filter := bson.M{"key": key, "value": value}
+	err := r.collection.FindOne(ctx, filter).Decode(&attr)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, models.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get user attribute by key and value: %w", err)
+	}
+	return &attr, nil
 }
 
 func (r *userAttributeRepo) GetByTags(ctx context.Context, tags []string) ([]*models.UserAttribute, error) {
