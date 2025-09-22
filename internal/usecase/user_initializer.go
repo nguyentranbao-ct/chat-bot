@@ -83,8 +83,9 @@ func AutoMigrateUsers(userRepo mongodb.UserRepository, userAttrRepo mongodb.User
 
 		if existingUser == nil {
 			user := &models.User{
-				Name:  defaultUser.Name,
-				Email: defaultUser.Email,
+				Name:       defaultUser.Name,
+				Email:      defaultUser.Email,
+				IsInternal: true,
 			}
 			if err := userRepo.Create(ctx, user); err != nil {
 				return fmt.Errorf("failed to create user '%s': %w", defaultUser.Email, err)
@@ -157,7 +158,8 @@ func AutoMigrateChannels(userRepo mongodb.UserRepository, channelRepo mongodb.Ch
 
 	// Create channels if they don't exist
 	for _, defaultChannel := range defaultChannels {
-		existingChannel, err := channelRepo.GetByExternalChannelID(ctx, defaultChannel.ExternalChannelID)
+		// Use GetByVendorChannelID instead of deprecated GetByExternalChannelID for consistency
+		existingChannel, err := channelRepo.GetByVendorChannelID(ctx, "chotot", defaultChannel.ExternalChannelID)
 		if err != nil && existingChannel == nil {
 			// Find owner user by email
 			ownerUser, err := userRepo.GetByEmail(ctx, defaultChannel.OwnerEmail)
@@ -167,10 +169,25 @@ func AutoMigrateChannels(userRepo mongodb.UserRepository, channelRepo mongodb.Ch
 			}
 
 			now := time.Now()
+
+			// Create metadata from item name and price
+			metadata := make(map[string]any)
+			if defaultChannel.ItemName != "" {
+				metadata["item_name"] = defaultChannel.ItemName
+			}
+			if defaultChannel.ItemPrice != "" {
+				metadata["item_price"] = defaultChannel.ItemPrice
+			}
+
 			channel := &models.Channel{
+				Vendor: models.ChannelVendor{
+					ChannelID: defaultChannel.ExternalChannelID,
+					Name:      "chotot", // Default vendor for demo channels
+				},
 				Name:       defaultChannel.Name,
 				Context:    defaultChannel.Context,
 				Type:       defaultChannel.Type,
+				Metadata:   metadata,
 				CreatedAt:  now,
 				UpdatedAt:  now,
 				IsArchived: false,
@@ -179,12 +196,12 @@ func AutoMigrateChannels(userRepo mongodb.UserRepository, channelRepo mongodb.Ch
 			if err := channelRepo.Create(ctx, channel); err != nil {
 				return fmt.Errorf("failed to create channel '%s': %w", defaultChannel.ExternalChannelID, err)
 			}
-			log.Infow(ctx, "Created default channel", "external_channel_id", defaultChannel.ExternalChannelID, "name", defaultChannel.Name)
+			log.Infow(ctx, "Created default channel", "vendor_channel_id", defaultChannel.ExternalChannelID, "name", defaultChannel.Name)
 
 			// Create channel member for the owner
 			member := &models.ChannelMember{
 				ChannelID: channel.ID,
-				UserID:    defaultChannel.OwnerEmail, // Using email as user ID for simplicity
+				UserID:    ownerUser.ID, // Using email as user ID for simplicity
 				Role:      "seller",
 				JoinedAt:  now,
 				IsActive:  true,
@@ -193,9 +210,9 @@ func AutoMigrateChannels(userRepo mongodb.UserRepository, channelRepo mongodb.Ch
 			if err := channelMemberRepo.Create(ctx, member); err != nil {
 				return fmt.Errorf("failed to create channel member for '%s': %w", defaultChannel.ExternalChannelID, err)
 			}
-			log.Infow(ctx, "Created channel member", "external_channel_id", defaultChannel.ExternalChannelID, "user_id", defaultChannel.OwnerEmail)
+			log.Infow(ctx, "Created channel member", "vendor_channel_id", defaultChannel.ExternalChannelID, "user_id", defaultChannel.OwnerEmail)
 		} else {
-			log.Debugw(ctx, "Channel already exists", "external_channel_id", defaultChannel.ExternalChannelID)
+			log.Debugw(ctx, "Channel already exists", "vendor_channel_id", defaultChannel.ExternalChannelID)
 		}
 	}
 
@@ -209,24 +226,47 @@ func AutoMigrateChannels(userRepo mongodb.UserRepository, channelRepo mongodb.Ch
 
 	// Create messages if they don't exist
 	for _, defaultMessage := range defaultMessages {
-		// Find channel by external channel ID
-		channel, err := channelRepo.GetByExternalChannelID(ctx, defaultMessage.ExternalChannelID)
-		if err != nil || channel == nil {
-			log.Warnw(ctx, "Channel not found for message", "external_channel_id", defaultMessage.ExternalChannelID)
+		user, err := userRepo.GetByEmail(ctx, defaultMessage.SenderID)
+		if err != nil || user == nil {
+			log.Warnw(ctx, "Sender user not found for message", "sender_id", defaultMessage.SenderID)
 			continue
 		}
 
-		// Check if we already have messages for this channel to avoid duplicates
-		existingMessages, err := messageRepo.GetChannelMessages(ctx, channel.ID, 1, nil)
-		if err == nil && len(existingMessages) > 0 {
-			log.Debugw(ctx, "Messages already exist for channel", "external_channel_id", defaultMessage.ExternalChannelID)
+		// Find channel by vendor channel ID (consistent with channel creation)
+		channel, err := channelRepo.GetByVendorChannelID(ctx, "chotot", defaultMessage.ExternalChannelID)
+		if err != nil || channel == nil {
+			log.Warnw(ctx, "Channel not found for message", "vendor_channel_id", defaultMessage.ExternalChannelID)
 			continue
+		}
+
+		// Check if we already have a message with the same content and sender to avoid exact duplicates
+		existingMessages, err := messageRepo.GetChannelMessages(ctx, channel.ID, 100, nil) // Check more messages to detect duplicates
+		if err == nil {
+			isDuplicate := false
+			for _, existingMsg := range existingMessages {
+				user, err := userRepo.GetByEmail(ctx, defaultMessage.SenderID)
+				if err != nil || user == nil {
+					log.Warnw(ctx, "Sender user not found for message", "sender_id", defaultMessage.SenderID)
+					break
+				}
+
+				if existingMsg.SenderID == user.ID &&
+					existingMsg.Content == defaultMessage.Content &&
+					existingMsg.Metadata.Source == "demo_data" {
+					isDuplicate = true
+					break
+				}
+			}
+			if isDuplicate {
+				log.Debugw(ctx, "Message already exists for channel", "vendor_channel_id", defaultMessage.ExternalChannelID, "sender_id", defaultMessage.SenderID)
+				continue
+			}
 		}
 
 		now := time.Now()
 		message := &models.ChatMessage{
 			ChannelID:      channel.ID,
-			SenderID:       defaultMessage.SenderID,
+			SenderID:       user.ID,
 			Content:        defaultMessage.Content,
 			CreatedAt:      now,
 			UpdatedAt:      now,
@@ -242,7 +282,7 @@ func AutoMigrateChannels(userRepo mongodb.UserRepository, channelRepo mongodb.Ch
 		if err := messageRepo.Create(ctx, message); err != nil {
 			return fmt.Errorf("failed to create message for channel '%s': %w", defaultMessage.ExternalChannelID, err)
 		}
-		log.Infow(ctx, "Created default message", "external_channel_id", defaultMessage.ExternalChannelID, "sender_id", defaultMessage.SenderID)
+		log.Infow(ctx, "Created default message", "vendor_channel_id", defaultMessage.ExternalChannelID, "sender_id", defaultMessage.SenderID)
 
 		// Update channel's last message time
 		if err := channelRepo.UpdateLastMessage(ctx, channel.ID); err != nil {

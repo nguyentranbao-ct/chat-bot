@@ -290,9 +290,10 @@ func (r *migrationRepo) SetMigrationStatus(ctx context.Context, migrationName st
 		},
 	}
 
-	if status == "running" {
+	switch status {
+	case "running":
 		update["$set"].(bson.M)["started_at"] = now
-	} else if status == "completed" || status == "failed" {
+	case "completed", "failed":
 		update["$set"].(bson.M)["completed_at"] = now
 		if result != nil {
 			update["$set"].(bson.M)["result"] = result

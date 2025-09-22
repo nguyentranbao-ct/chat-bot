@@ -73,19 +73,19 @@ func (r *chatMessageRepo) Upsert(ctx context.Context, message *models.ChatMessag
 
 	update := bson.M{
 		"$set": bson.M{
-			"channel_id":           message.ChannelID,
-			"sender_id":            message.SenderID,
-			"content":              message.Content,
-			"blocks":               message.Blocks,
-			"thread_id":            message.ThreadID,
-			"reply_to_message_id":  message.ReplyToMessageID,
-			"updated_at":           now,
-			"is_deleted":           message.IsDeleted,
-			"is_edited":            message.IsEdited,
-			"edited_at":            message.EditedAt,
-			"metadata":             message.Metadata,
-			"external_message_id":  message.ExternalMessageID,
-			"delivery_status":      message.DeliveryStatus,
+			"channel_id":          message.ChannelID,
+			"sender_id":           message.SenderID,
+			"content":             message.Content,
+			"blocks":              message.Blocks,
+			"thread_id":           message.ThreadID,
+			"reply_to_message_id": message.ReplyToMessageID,
+			"updated_at":          now,
+			"is_deleted":          message.IsDeleted,
+			"is_edited":           message.IsEdited,
+			"edited_at":           message.EditedAt,
+			"metadata":            message.Metadata,
+			"external_message_id": message.ExternalMessageID,
+			"delivery_status":     message.DeliveryStatus,
 		},
 		"$setOnInsert": bson.M{
 			"created_at": now,
@@ -329,10 +329,10 @@ func (r *messageEventRepo) Create(ctx context.Context, event *models.MessageEven
 
 // CreateEventParams contains parameters for creating a message event
 type CreateEventParams struct {
-	ChannelID primitive.ObjectID      `json:"channel_id"`
-	EventType string                  `json:"event_type"`
-	MessageID *primitive.ObjectID     `json:"message_id,omitempty"`
-	UserID    string                  `json:"user_id"`
+	ChannelID primitive.ObjectID     `json:"channel_id"`
+	EventType string                 `json:"event_type"`
+	MessageID *primitive.ObjectID    `json:"message_id,omitempty"`
+	UserID    primitive.ObjectID     `json:"user_id"`
 	EventData map[string]interface{} `json:"event_data,omitempty"`
 }
 
@@ -386,86 +386,5 @@ func (r *messageEventRepo) CleanupExpiredEvents(ctx context.Context) error {
 	}
 
 	_, err := r.collection.DeleteMany(ctx, filter)
-	return err
-}
-
-type TypingIndicatorRepository interface {
-	SetTyping(ctx context.Context, channelID primitive.ObjectID, userID string, isTyping bool) error
-	GetTypingUsers(ctx context.Context, channelID primitive.ObjectID) ([]*models.TypingIndicator, error)
-	CleanupExpiredTyping(ctx context.Context) error
-}
-
-type typingIndicatorRepo struct {
-	collection *mongo.Collection
-}
-
-func NewTypingIndicatorRepository(db *DB) TypingIndicatorRepository {
-	return &typingIndicatorRepo{
-		collection: db.Database.Collection("typing_indicators"),
-	}
-}
-
-func (r *typingIndicatorRepo) SetTyping(ctx context.Context, channelID primitive.ObjectID, userID string, isTyping bool) error {
-	filter := bson.M{
-		"channel_id": channelID,
-		"user_id":    userID,
-	}
-
-	update := bson.M{
-		"$set": bson.M{
-			"is_typing":  isTyping,
-			"updated_at": time.Now(),
-			"expires_at": time.Now().Add(30 * time.Second), // Typing expires after 30 seconds
-		},
-		"$setOnInsert": bson.M{
-			"channel_id": channelID,
-			"user_id":    userID,
-		},
-	}
-
-	opts := options.Update().SetUpsert(true)
-	_, err := r.collection.UpdateOne(ctx, filter, update, opts)
-	return err
-}
-
-func (r *typingIndicatorRepo) GetTypingUsers(ctx context.Context, channelID primitive.ObjectID) ([]*models.TypingIndicator, error) {
-	filter := bson.M{
-		"channel_id": channelID,
-		"is_typing":  true,
-		"expires_at": bson.M{"$gt": time.Now()},
-	}
-
-	cursor, err := r.collection.Find(ctx, filter)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get typing users: %w", err)
-	}
-	defer cursor.Close(ctx)
-
-	var indicators []*models.TypingIndicator
-	for cursor.Next(ctx) {
-		var indicator models.TypingIndicator
-		if err := cursor.Decode(&indicator); err != nil {
-			return nil, fmt.Errorf("failed to decode typing indicator: %w", err)
-		}
-		indicators = append(indicators, &indicator)
-	}
-
-	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf("cursor error: %w", err)
-	}
-
-	return indicators, nil
-}
-
-func (r *typingIndicatorRepo) CleanupExpiredTyping(ctx context.Context) error {
-	filter := bson.M{
-		"expires_at": bson.M{"$lte": time.Now()},
-	}
-
-	update := bson.M{
-		"$set": bson.M{"is_typing": false},
-	}
-
-	_, err := r.collection.UpdateMany(ctx, filter, update)
 	return err
 }

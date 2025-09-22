@@ -152,7 +152,7 @@ type UserUsecase interface {
 - name: 'Test User'
   email: 'test@example.com'
 - name: 'Demo User'
-  email: 'demo@example.com'
+  email: 'demo@chotot.vn'
 ```
 
 ### `internal/usecase/default_user_attributes.yaml`
@@ -163,7 +163,7 @@ type UserUsecase interface {
   key: 'chotot_id'
   value: '123456'
   tags: ['chotot', 'link_id']
-- user_email: 'demo@example.com'
+- user_email: 'demo@chotot.vn'
   key: 'chotot_id'
   value: '789012'
   tags: ['chotot', 'link_id']
@@ -415,6 +415,7 @@ Add providers for:
 ## Final Implementation Notes
 
 ### Key Decisions Made:
+
 - **Authentication**: No authentication required initially, simple ID-based access
 - **User Management**: Self-registration allowed, no roles/permissions initially
 - **Data Validation**: Alpha-numeric with underscores for attribute keys

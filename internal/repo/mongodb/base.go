@@ -13,8 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var none struct{}
-
 // keep the baseRepo implementation in sync with IRepository interface
 var _ IRepository[IEntity] = (*baseRepo[IEntity])(nil)
 

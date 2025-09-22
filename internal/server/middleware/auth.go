@@ -34,21 +34,3 @@ func JWTAuth(authUsecase *usecase.AuthUseCase) echo.MiddlewareFunc {
 		}
 	}
 }
-
-func OptionalJWTAuth(authUsecase *usecase.AuthUseCase) echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			authHeader := c.Request().Header.Get("Authorization")
-			if authHeader != "" {
-				tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-				if tokenString != authHeader {
-					ctx := c.Request().Context()
-					if user, err := authUsecase.ValidateToken(ctx, tokenString); err == nil {
-						c.Set("user", user)
-					}
-				}
-			}
-			return next(c)
-		}
-	}
-}

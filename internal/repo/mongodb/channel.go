@@ -18,9 +18,9 @@ type ChannelRepository interface {
 	GetByID(ctx context.Context, id primitive.ObjectID) (*models.Channel, error)
 	GetByVendorChannelID(ctx context.Context, vendorName, vendorChannelID string) (*models.Channel, error)
 	GetByExternalChannelID(ctx context.Context, externalChannelID string) (*models.Channel, error) // Deprecated: use GetByVendorChannelID
-	GetUserChannels(ctx context.Context, userID string) ([]*models.Channel, error)
+	GetUserChannels(ctx context.Context, userID primitive.ObjectID) ([]*models.Channel, error)
 	UpdateLastMessage(ctx context.Context, channelID primitive.ObjectID) error
-	GetChannelsWithUnreadCount(ctx context.Context, userID string) ([]bson.M, error)
+	GetChannelsWithUnreadCount(ctx context.Context, userID primitive.ObjectID) ([]bson.M, error)
 }
 
 type channelRepo struct {
@@ -96,7 +96,7 @@ func (r *channelRepo) GetByExternalChannelID(ctx context.Context, externalChanne
 	return &channel, nil
 }
 
-func (r *channelRepo) GetUserChannels(ctx context.Context, userID string) ([]*models.Channel, error) {
+func (r *channelRepo) GetUserChannels(ctx context.Context, userID primitive.ObjectID) ([]*models.Channel, error) {
 	// Join with channel_members to get user's channels
 	pipeline := []bson.M{
 		{
@@ -146,7 +146,7 @@ func (r *channelRepo) UpdateLastMessage(ctx context.Context, channelID primitive
 	return err
 }
 
-func (r *channelRepo) GetChannelsWithUnreadCount(ctx context.Context, userID string) ([]bson.M, error) {
+func (r *channelRepo) GetChannelsWithUnreadCount(ctx context.Context, userID primitive.ObjectID) ([]bson.M, error) {
 	pipeline := []bson.M{
 		{
 			"$lookup": bson.M{
@@ -197,18 +197,18 @@ func (r *channelRepo) GetChannelsWithUnreadCount(ctx context.Context, userID str
 		},
 		{
 			"$project": bson.M{
-				"id":                "$_id",
-				"vendor":             1,
-				"name":               1,
-				"metadata":           1,
-				"context":            1,
-				"type":               1,
-				"created_at":         1,
-				"updated_at":         1,
-				"last_message_at":    1,
-				"is_archived":        1,
-				"unread_count":       1,
-				"_id":                0, // Only _id can be excluded in an inclusion projection
+				"id":              "$_id",
+				"vendor":          1,
+				"name":            1,
+				"metadata":        1,
+				"context":         1,
+				"type":            1,
+				"created_at":      1,
+				"updated_at":      1,
+				"last_message_at": 1,
+				"is_archived":     1,
+				"unread_count":    1,
+				"_id":             0, // Only _id can be excluded in an inclusion projection
 			},
 		},
 	}
@@ -230,9 +230,9 @@ func (r *channelRepo) GetChannelsWithUnreadCount(ctx context.Context, userID str
 type ChannelMemberRepository interface {
 	Create(ctx context.Context, member *models.ChannelMember) error
 	GetChannelMembers(ctx context.Context, channelID primitive.ObjectID) ([]*models.ChannelMember, error)
-	GetMember(ctx context.Context, channelID primitive.ObjectID, userID string) (*models.ChannelMember, error)
-	AddMember(ctx context.Context, channelID primitive.ObjectID, userID, role string) error
-	RemoveMember(ctx context.Context, channelID primitive.ObjectID, userID string) error
+	GetMember(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) (*models.ChannelMember, error)
+	AddMember(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID, role string) error
+	RemoveMember(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) error
 }
 
 type channelMemberRepo struct {
@@ -284,7 +284,7 @@ func (r *channelMemberRepo) GetChannelMembers(ctx context.Context, channelID pri
 	return members, nil
 }
 
-func (r *channelMemberRepo) GetMember(ctx context.Context, channelID primitive.ObjectID, userID string) (*models.ChannelMember, error) {
+func (r *channelMemberRepo) GetMember(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) (*models.ChannelMember, error) {
 	var member models.ChannelMember
 	err := r.collection.FindOne(ctx, bson.M{
 		"channel_id": channelID,
@@ -299,7 +299,7 @@ func (r *channelMemberRepo) GetMember(ctx context.Context, channelID primitive.O
 	return &member, nil
 }
 
-func (r *channelMemberRepo) AddMember(ctx context.Context, channelID primitive.ObjectID, userID, role string) error {
+func (r *channelMemberRepo) AddMember(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID, role string) error {
 	member := &models.ChannelMember{
 		ChannelID: channelID,
 		UserID:    userID,
@@ -310,7 +310,7 @@ func (r *channelMemberRepo) AddMember(ctx context.Context, channelID primitive.O
 	return r.Create(ctx, member)
 }
 
-func (r *channelMemberRepo) RemoveMember(ctx context.Context, channelID primitive.ObjectID, userID string) error {
+func (r *channelMemberRepo) RemoveMember(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) error {
 	filter := bson.M{
 		"channel_id": channelID,
 		"user_id":    userID,
@@ -327,9 +327,9 @@ func (r *channelMemberRepo) RemoveMember(ctx context.Context, channelID primitiv
 }
 
 type UnreadCountRepository interface {
-	GetUnreadCount(ctx context.Context, channelID primitive.ObjectID, userID string) (*models.UnreadCount, error)
-	IncrementUnreadCount(ctx context.Context, channelID primitive.ObjectID, userID string) error
-	MarkAsRead(ctx context.Context, channelID primitive.ObjectID, userID string, lastReadMessageID primitive.ObjectID) error
+	GetUnreadCount(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) (*models.UnreadCount, error)
+	IncrementUnreadCount(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) error
+	MarkAsRead(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error
 }
 
 type unreadCountRepo struct {
@@ -342,7 +342,7 @@ func NewUnreadCountRepository(db *DB) UnreadCountRepository {
 	}
 }
 
-func (r *unreadCountRepo) GetUnreadCount(ctx context.Context, channelID primitive.ObjectID, userID string) (*models.UnreadCount, error) {
+func (r *unreadCountRepo) GetUnreadCount(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) (*models.UnreadCount, error) {
 	var unreadCount models.UnreadCount
 	err := r.collection.FindOne(ctx, bson.M{
 		"channel_id": channelID,
@@ -357,7 +357,7 @@ func (r *unreadCountRepo) GetUnreadCount(ctx context.Context, channelID primitiv
 	return &unreadCount, nil
 }
 
-func (r *unreadCountRepo) IncrementUnreadCount(ctx context.Context, channelID primitive.ObjectID, userID string) error {
+func (r *unreadCountRepo) IncrementUnreadCount(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) error {
 	filter := bson.M{
 		"channel_id": channelID,
 		"user_id":    userID,
@@ -377,7 +377,7 @@ func (r *unreadCountRepo) IncrementUnreadCount(ctx context.Context, channelID pr
 	return err
 }
 
-func (r *unreadCountRepo) MarkAsRead(ctx context.Context, channelID primitive.ObjectID, userID string, lastReadMessageID primitive.ObjectID) error {
+func (r *unreadCountRepo) MarkAsRead(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error {
 	filter := bson.M{
 		"channel_id": channelID,
 		"user_id":    userID,

@@ -86,7 +86,6 @@ func StartServer(
 	chatGroup.GET("/channels/:id/messages", chatController.GetChannelMessages)
 	chatGroup.GET("/channels/:id/events", chatController.GetChannelEvents)
 	chatGroup.POST("/channels/:id/read", chatController.MarkAsRead)
-	chatGroup.POST("/channels/:id/typing", chatController.SetTyping)
 
 	// User management routes (keeping for backward compatibility)
 	api.POST("/users", handler.CreateUser)

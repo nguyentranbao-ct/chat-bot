@@ -10,7 +10,6 @@ type User struct {
 	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	Name       string             `bson:"name" json:"name"`
 	Email      string             `bson:"email" json:"email" validate:"required,email"`
-	ChatMode   string             `bson:"chat_mode" json:"chat_mode"`
 	IsActive   bool               `bson:"is_active" json:"is_active"`
 	IsInternal bool               `bson:"is_internal" json:"is_internal"`
 	CreatedAt  time.Time          `bson:"created_at" json:"created_at"`

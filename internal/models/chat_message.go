@@ -10,7 +10,7 @@ import (
 type ChatMessage struct {
 	ID                primitive.ObjectID  `bson:"_id,omitempty" json:"id"`
 	ChannelID         primitive.ObjectID  `bson:"channel_id" json:"channel_id" validate:"required"`
-	SenderID          string              `bson:"sender_id" json:"sender_id" validate:"required"`
+	SenderID          primitive.ObjectID  `bson:"sender_id" json:"sender_id" validate:"required"`
 	Content           string              `bson:"content" json:"content"`     // plain text content
 	Blocks            []MessageBlock      `bson:"blocks" json:"blocks"`       // Slack-style blocks
 	ThreadID          *primitive.ObjectID `bson:"thread_id" json:"thread_id"` // for threaded conversations
@@ -71,7 +71,7 @@ type MessageEvent struct {
 	ChannelID primitive.ObjectID     `bson:"channel_id" json:"channel_id" validate:"required"`
 	EventType string                 `bson:"event_type" json:"event_type"` // "message_sent", "message_updated", "message_deleted", "user_typing"
 	MessageID *primitive.ObjectID    `bson:"message_id" json:"message_id"`
-	UserID    string                 `bson:"user_id" json:"user_id"`
+	UserID    primitive.ObjectID     `bson:"user_id" json:"user_id"`
 	EventData map[string]interface{} `bson:"event_data" json:"event_data"`
 	CreatedAt time.Time              `bson:"created_at" json:"created_at"`
 	ExpiresAt time.Time              `bson:"expires_at" json:"expires_at"` // TTL for temporary events

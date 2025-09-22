@@ -9,12 +9,12 @@
   value: 'ebb1d506e8b8de644fc209d933f5c76a'
   tags: ['chotot', 'account_oid']
 
-- user_email: 'demo@example.com'
+- user_email: 'demo@chotot.vn'
   key: 'chotot_id'
   value: '11198316'
   tags: ['chotot', 'link_id']
 
-- user_email: 'demo@example.com'
+- user_email: 'demo@chotot.vn'
   key: 'chotot_oid'
   value: '7c959ccf9350ef33fc85e65f4dcc5eac'
   tags: ['chotot', 'account_oid']

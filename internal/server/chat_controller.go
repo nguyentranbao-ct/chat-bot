@@ -20,7 +20,6 @@ type ChatController interface {
 	GetChannelEvents(c echo.Context) error
 	GetChannelMessages(c echo.Context) error
 	MarkAsRead(c echo.Context) error
-	SetTyping(c echo.Context) error
 }
 
 type chatController struct {
@@ -39,7 +38,7 @@ func (cc *chatController) GetChannels(c echo.Context) error {
 	user := c.Get("user").(*models.User)
 
 	ctx := c.Request().Context()
-	channels, err := cc.chatUsecase.GetUserChannels(ctx, user.Email)
+	channels, err := cc.chatUsecase.GetUserChannels(ctx, user.ID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -91,7 +90,7 @@ func (cc *chatController) SendMessage(c echo.Context) error {
 	ctx := c.Request().Context()
 	params := usecase.SendMessageParams{
 		ChannelID:   channelID,
-		SenderID:    user.ID.Hex(),
+		SenderID:    user.ID,
 		Content:     req.Content,
 		MessageType: req.MessageType,
 		Blocks:      req.Blocks,
@@ -112,7 +111,7 @@ func (cc *chatController) SendMessage(c echo.Context) error {
 
 		userIDs := make([]string, 0, len(members))
 		for _, member := range members {
-			userIDs = append(userIDs, member.UserID)
+			userIDs = append(userIDs, member.UserID.Hex())
 		}
 
 		cc.socketBroadcaster.BroadcastMessageToUsers(userIDs, message)
@@ -212,56 +211,12 @@ func (cc *chatController) MarkAsRead(c echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	if err := cc.chatUsecase.MarkAsRead(ctx, channelID, user.Email, messageID); err != nil {
+	if err := cc.chatUsecase.MarkAsRead(ctx, channelID, user.ID, messageID); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{
 		"status":  "success",
 		"message": "marked as read",
-	})
-}
-
-type SetTypingRequest struct {
-	IsTyping bool `json:"is_typing"`
-}
-
-func (cc *chatController) SetTyping(c echo.Context) error {
-	user := c.Get("user").(*models.User)
-
-	channelIDParam := c.Param("id")
-	channelID, err := primitive.ObjectIDFromHex(channelIDParam)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid channel ID")
-	}
-
-	var req SetTypingRequest
-	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
-	}
-
-	ctx := c.Request().Context()
-	if err := cc.chatUsecase.SetTyping(ctx, channelID, user.Email, req.IsTyping); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-
-	// Broadcast typing status to channel members via socket
-	go func() {
-		members, err := cc.chatUsecase.GetChannelMembers(ctx, channelID)
-		if err != nil {
-			fmt.Printf("Failed to get channel members for typing broadcast: %v\n", err)
-			return
-		}
-
-		userIDs := make([]string, 0, len(members))
-		for _, member := range members {
-			userIDs = append(userIDs, member.UserID)
-		}
-
-		cc.socketBroadcaster.BroadcastTypingToUsers(userIDs, channelID.Hex(), user.ID.Hex(), req.IsTyping)
-	}()
-
-	return c.JSON(http.StatusOK, map[string]string{
-		"status": "success",
 	})
 }

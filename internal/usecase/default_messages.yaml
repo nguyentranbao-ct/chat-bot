@@ -6,7 +6,7 @@
   is_from_bot: false
 
 - external_channel_id: 'demo_channel_001'
-  sender_id: 'demo@example.com'
+  sender_id: 'demo@chotot.vn'
   content: 'Hello! Yes, the iPhone 13 Pro is still available. It is in excellent condition with 95% battery health and comes with the original box, charger, and earphones. Would you like to see more photos or have any specific questions?'
   message_type: 'text'
   is_from_bot: true
@@ -18,7 +18,7 @@
   is_from_bot: false
 
 - external_channel_id: 'demo_channel_002'
-  sender_id: 'demo@example.com'
+  sender_id: 'demo@chotot.vn'
   content: 'Hi there! The Honda Civic has been well maintained with regular service every 5,000km. All services were done at authorized Honda service centers. It has only 45,000km on the odometer and no accidents. I have all the service records available for review.'
   message_type: 'text'
   is_from_bot: true
@@ -30,7 +30,7 @@
   is_from_bot: false
 
 - external_channel_id: 'demo_channel_003'
-  sender_id: 'demo@example.com'
+  sender_id: 'demo@chotot.vn'
   content: 'Yes! The MacBook Air M2 still has 8 months left on the Apple warranty. I bought it in February 2024, so the warranty is valid until February 2025. It also qualifies for AppleCare+ if you are interested in extending the coverage.'
   message_type: 'text'
   is_from_bot: true
@@ -42,7 +42,7 @@
   is_from_bot: false
 
 - external_channel_id: 'demo_channel_004'
-  sender_id: 'demo@example.com'
+  sender_id: 'demo@chotot.vn'
   content: 'Absolutely! The gaming PC features an RTX 4070, AMD Ryzen 7 5800X, 32GB DDR4 RAM, and 1TB NVMe SSD. It easily runs all the latest games at high/ultra settings in 1440p. The setup includes a 27-inch 144Hz monitor, mechanical keyboard, and gaming mouse. Perfect for competitive gaming!'
   message_type: 'text'
   is_from_bot: true

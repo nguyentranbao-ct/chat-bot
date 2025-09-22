@@ -15,16 +15,15 @@ import (
 )
 
 type ChatUseCase struct {
-	channelRepo         mongodb.ChannelRepository
-	channelMemberRepo   mongodb.ChannelMemberRepository
-	chatMessageRepo     mongodb.ChatMessageRepository
-	messageEventRepo    mongodb.MessageEventRepository
-	typingIndicatorRepo mongodb.TypingIndicatorRepository
-	unreadCountRepo     mongodb.UnreadCountRepository
-	userRepo            mongodb.UserRepository
-	userAttributeRepo   mongodb.UserAttributeRepository
-	vendorRegistry      *vendors.VendorRegistry
-	socketHandler       SocketBroadcaster
+	channelRepo       mongodb.ChannelRepository
+	channelMemberRepo mongodb.ChannelMemberRepository
+	chatMessageRepo   mongodb.ChatMessageRepository
+	messageEventRepo  mongodb.MessageEventRepository
+	unreadCountRepo   mongodb.UnreadCountRepository
+	userRepo          mongodb.UserRepository
+	userAttributeRepo mongodb.UserAttributeRepository
+	vendorRegistry    *vendors.VendorRegistry
+	socketHandler     SocketBroadcaster
 }
 
 type SocketBroadcaster interface {
@@ -40,7 +39,6 @@ func NewChatUseCase(
 	channelMemberRepo mongodb.ChannelMemberRepository,
 	chatMessageRepo mongodb.ChatMessageRepository,
 	messageEventRepo mongodb.MessageEventRepository,
-	typingIndicatorRepo mongodb.TypingIndicatorRepository,
 	unreadCountRepo mongodb.UnreadCountRepository,
 	userRepo mongodb.UserRepository,
 	userAttributeRepo mongodb.UserAttributeRepository,
@@ -48,20 +46,19 @@ func NewChatUseCase(
 	socketHandler SocketBroadcaster,
 ) *ChatUseCase {
 	return &ChatUseCase{
-		channelRepo:         channelRepo,
-		channelMemberRepo:   channelMemberRepo,
-		chatMessageRepo:     chatMessageRepo,
-		messageEventRepo:    messageEventRepo,
-		typingIndicatorRepo: typingIndicatorRepo,
-		unreadCountRepo:     unreadCountRepo,
-		userRepo:            userRepo,
-		userAttributeRepo:   userAttributeRepo,
-		vendorRegistry:      vendorRegistry,
-		socketHandler:       socketHandler,
+		channelRepo:       channelRepo,
+		channelMemberRepo: channelMemberRepo,
+		chatMessageRepo:   chatMessageRepo,
+		messageEventRepo:  messageEventRepo,
+		unreadCountRepo:   unreadCountRepo,
+		userRepo:          userRepo,
+		userAttributeRepo: userAttributeRepo,
+		vendorRegistry:    vendorRegistry,
+		socketHandler:     socketHandler,
 	}
 }
 
-func (uc *ChatUseCase) GetUserChannels(ctx context.Context, userID string) ([]interface{}, error) {
+func (uc *ChatUseCase) GetUserChannels(ctx context.Context, userID primitive.ObjectID) ([]interface{}, error) {
 	results, err := uc.channelRepo.GetChannelsWithUnreadCount(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -83,7 +80,7 @@ func (uc *ChatUseCase) GetChannelMembers(ctx context.Context, channelID primitiv
 // SendMessageParams contains parameters for sending a message
 type SendMessageParams struct {
 	ChannelID   primitive.ObjectID     `json:"channel_id"`
-	SenderID    string                 `json:"sender_id"`
+	SenderID    primitive.ObjectID     `json:"sender_id"`
 	Content     string                 `json:"content"`
 	MessageType string                 `json:"message_type"`
 	Blocks      []models.MessageBlock  `json:"blocks,omitempty"`
@@ -159,10 +156,20 @@ func (uc *ChatUseCase) sendToExternalVendor(ctx context.Context, message *models
 		return
 	}
 
+	// get sender chotot id from user attributes
+	idAttr, err := uc.userAttributeRepo.GetByUserIDAndKey(timeoutCtx, params.SenderID, "chotot_id")
+	if err != nil {
+		log.Errorw(timeoutCtx, "Failed to get sender chotot_id attribute",
+			"user_id", params.SenderID.Hex(),
+			"error", err)
+		uc.chatMessageRepo.UpdateDeliveryStatus(timeoutCtx, message.ID, "failed")
+		return
+	}
+
 	// Prepare vendor send params
 	sendParams := vendors.SendMessageParams{
 		ChannelID:   channel.Vendor.ChannelID,
-		SenderID:    params.SenderID,
+		SenderID:    idAttr.Value,
 		Content:     params.Content,
 		MessageType: params.MessageType,
 		Metadata:    params.Metadata,
@@ -209,52 +216,13 @@ func (uc *ChatUseCase) GetChannelEvents(ctx context.Context, channelID primitive
 	return uc.messageEventRepo.GetChannelEvents(ctx, channelID, sinceTime)
 }
 
-func (uc *ChatUseCase) MarkAsRead(ctx context.Context, channelID primitive.ObjectID, userID string, lastReadMessageID primitive.ObjectID) error {
+func (uc *ChatUseCase) MarkAsRead(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error {
 	return uc.unreadCountRepo.MarkAsRead(ctx, channelID, userID, lastReadMessageID)
-}
-
-func (uc *ChatUseCase) SetTyping(ctx context.Context, channelID primitive.ObjectID, userID string, isTyping bool) error {
-	if err := uc.typingIndicatorRepo.SetTyping(ctx, channelID, userID, isTyping); err != nil {
-		return err
-	}
-
-	// Create typing event for real-time updates
-	go uc.createTypingEvent(ctx, channelID, userID, isTyping)
-
-	return nil
-}
-
-// createTypingEvent creates a real-time event for typing indicators
-func (uc *ChatUseCase) createTypingEvent(ctx context.Context, channelID primitive.ObjectID, userID string, isTyping bool) {
-	ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
-	defer cancel()
-	eventType := "user_typing_stop"
-	if isTyping {
-		eventType = "user_typing_start"
-	}
-
-	eventParams := mongodb.CreateEventParams{
-		ChannelID: channelID,
-		EventType: eventType,
-		MessageID: nil,
-		UserID:    userID,
-		EventData: map[string]any{
-			"is_typing": isTyping,
-		},
-	}
-
-	if err := uc.messageEventRepo.CreateEvent(ctx, eventParams); err != nil {
-		log.Errorw(ctx, "Failed to create typing event", "error", err)
-	}
 }
 
 func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage models.KafkaMessageData) error {
 	// Detect vendor for deduplication
-	vendorType, err := uc.vendorRegistry.DetectVendorFromChannelID(ctx, kafkaMessage.ChannelID)
-	if err != nil {
-		log.Warnw(ctx, "Failed to detect vendor for deduplication, defaulting to Chotot", "error", err)
-		vendorType = vendors.VendorTypeChotot
-	}
+	vendorType := vendors.VendorTypeChotot
 
 	// Check if sender is internal user (loop prevention)
 	if uc.isInternalUser(ctx, kafkaMessage.SenderID, vendorType) {
@@ -263,13 +231,13 @@ func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage 
 	}
 
 	// Find or sync user from vendor
-	_, err = uc.findOrSyncUser(ctx, kafkaMessage.SenderID, vendorType)
+	user, err := uc.findOrSyncUser(ctx, kafkaMessage.SenderID, vendorType)
 	if err != nil {
 		log.Warnw(ctx, "Failed to sync user, continuing without user info", "error", err, "sender_id", kafkaMessage.SenderID)
 	}
 
 	// Find or create channel
-	channel, err := uc.findOrCreateChannel(ctx, kafkaMessage)
+	channel, err := uc.findOrCreateChannel(ctx, kafkaMessage.ChannelID, vendorType)
 	if err != nil {
 		return fmt.Errorf("failed to find/create channel: %w", err)
 	}
@@ -277,7 +245,7 @@ func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage 
 	// Create message in our database
 	message := &models.ChatMessage{
 		ChannelID:      channel.ID,
-		SenderID:       kafkaMessage.SenderID,
+		SenderID:       user.ID,
 		Content:        kafkaMessage.Message,
 		CreatedAt:      time.Unix(kafkaMessage.CreatedAt, 0),
 		UpdatedAt:      time.Now(),
@@ -295,7 +263,7 @@ func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage 
 	}
 
 	// Post-process the incoming message
-	go uc.postProcessIncomingMessage(ctx, message, channel, kafkaMessage, vendorType)
+	go uc.postProcessIncomingMessage(ctx, message, channel, vendorType)
 
 	// Update channel last message time synchronously
 	if err := uc.channelRepo.UpdateLastMessage(ctx, channel.ID); err != nil {
@@ -306,30 +274,29 @@ func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage 
 }
 
 // postProcessIncomingMessage handles all post-processing after an incoming message is received
-func (uc *ChatUseCase) postProcessIncomingMessage(ctx context.Context, message *models.ChatMessage, channel *models.Channel, kafkaMessage models.KafkaMessageData, vendorType vendors.VendorType) {
+func (uc *ChatUseCase) postProcessIncomingMessage(ctx context.Context, message *models.ChatMessage, channel *models.Channel, vendorType vendors.VendorType) {
 	ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
 	defer cancel()
 	// Increment unread count for all members except sender
-	uc.incrementUnreadCountForOthers(ctx, channel.ID, kafkaMessage.SenderID)
+	uc.incrementUnreadCountForOthers(ctx, channel.ID, message.SenderID)
 
 	// Create message event for real-time sync
-	uc.createMessageReceivedEvent(ctx, message, channel, kafkaMessage)
+	uc.createMessageReceivedEvent(ctx, message, channel)
 
 	// Broadcast to socket connections
 	uc.broadcastIncomingMessage(ctx, message, channel.ID)
 }
 
 // createMessageReceivedEvent creates a real-time event for the received message
-func (uc *ChatUseCase) createMessageReceivedEvent(ctx context.Context, message *models.ChatMessage, channel *models.Channel, kafkaMessage models.KafkaMessageData) {
+func (uc *ChatUseCase) createMessageReceivedEvent(ctx context.Context, message *models.ChatMessage, channel *models.Channel) {
 	eventParams := mongodb.CreateEventParams{
 		ChannelID: channel.ID,
 		EventType: "message_received",
 		MessageID: &message.ID,
-		UserID:    kafkaMessage.SenderID,
+		UserID:    message.SenderID,
 		EventData: map[string]any{
-			"source":       "kafka",
-			"message_type": kafkaMessage.Type,
-			"content":      kafkaMessage.Message,
+			"source":  "kafka",
+			"content": message.Content,
 		},
 	}
 
@@ -352,28 +319,23 @@ func (uc *ChatUseCase) broadcastIncomingMessage(ctx context.Context, message *mo
 
 	userIDs := make([]string, 0, len(members))
 	for _, member := range members {
-		userIDs = append(userIDs, member.UserID)
+		userIDs = append(userIDs, member.UserID.Hex())
 	}
 
 	uc.socketHandler.BroadcastMessageToUsers(userIDs, message)
 }
 
-func (uc *ChatUseCase) findOrCreateChannel(ctx context.Context, kafkaMessage models.KafkaMessageData) (*models.Channel, error) {
-	// Detect vendor from channel ID (for now, default to Chotot)
-	vendorType, err := uc.vendorRegistry.DetectVendorFromChannelID(ctx, kafkaMessage.ChannelID)
-	if err != nil {
-		log.Warnw(ctx, "Failed to detect vendor, defaulting to Chotot", "error", err, "channel_id", kafkaMessage.ChannelID)
-		vendorType = vendors.VendorTypeChotot
-	}
-
+func (uc *ChatUseCase) findOrCreateChannel(ctx context.Context, channelID string, vendorType vendors.VendorType) (*models.Channel,
+	error,
+) {
 	// Try to find existing channel using vendor info
-	channel, err := uc.channelRepo.GetByVendorChannelID(ctx, string(vendorType), kafkaMessage.ChannelID)
+	channel, err := uc.channelRepo.GetByVendorChannelID(ctx, string(vendorType), channelID)
 	if err == nil {
 		return channel, nil
 	}
 
 	// Fallback: try legacy lookup for backward compatibility
-	channel, err = uc.channelRepo.GetByExternalChannelID(ctx, kafkaMessage.ChannelID)
+	channel, err = uc.channelRepo.GetByExternalChannelID(ctx, channelID)
 	if err == nil {
 		return channel, nil
 	}
@@ -385,7 +347,7 @@ func (uc *ChatUseCase) findOrCreateChannel(ctx context.Context, kafkaMessage mod
 	}
 
 	// Get channel info from vendor
-	vendorChannelInfo, err := vendorInstance.GetChannelInfo(ctx, kafkaMessage.ChannelID)
+	vendorChannelInfo, err := vendorInstance.GetChannelInfo(ctx, channelID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get channel info from vendor %s: %w", vendorType, err)
 	}
@@ -395,44 +357,53 @@ func (uc *ChatUseCase) findOrCreateChannel(ctx context.Context, kafkaMessage mod
 	for key, value := range vendorChannelInfo.Metadata {
 		metadata[key] = value
 	}
+	ts := time.Now()
 
 	channel = &models.Channel{
 		Vendor: models.ChannelVendor{
-			ChannelID: kafkaMessage.ChannelID,
+			ChannelID: channelID,
 			Name:      string(vendorType),
 		},
-		Name:       vendorChannelInfo.Name,
-		Context:    vendorChannelInfo.Context,
-		Type:       vendorChannelInfo.Type,
-		Metadata:   metadata,
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
-		IsArchived: false,
+		Name:          vendorChannelInfo.Name,
+		Context:       vendorChannelInfo.Context,
+		Type:          vendorChannelInfo.Type,
+		LastMessageAt: &ts,
+		Metadata:      metadata,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+		IsArchived:    false,
 	}
 
 	if err := uc.channelRepo.Create(ctx, channel); err != nil {
 		return nil, fmt.Errorf("failed to create channel: %w", err)
 	}
 
-	// Add channel members
+	// Add channel members - map vendor user IDs to internal user IDs
 	for _, participant := range vendorChannelInfo.Participants {
+		// Find or sync the user to get internal user ID
+		internalUser, err := uc.findOrSyncUser(ctx, participant.UserID, vendorType)
+		if err != nil {
+			log.Warnw(ctx, "Failed to sync participant user, skipping", "error", err, "vendor_user_id", participant.UserID)
+			continue
+		}
+
 		member := &models.ChannelMember{
 			ChannelID: channel.ID,
-			UserID:    participant.UserID,
+			UserID:    internalUser.ID, // Use internal user ID
 			Role:      participant.Role,
 			JoinedAt:  time.Now(),
 			IsActive:  true,
 		}
 
 		if err := uc.channelMemberRepo.Create(ctx, member); err != nil {
-			fmt.Printf("Failed to create channel member: %v\n", err)
+			log.Warnw(ctx, "Failed to create channel member", "error", err, "user_id", internalUser.ID.Hex())
 		}
 	}
 
 	return channel, nil
 }
 
-func (uc *ChatUseCase) incrementUnreadCountForOthers(ctx context.Context, channelID primitive.ObjectID, senderID string) {
+func (uc *ChatUseCase) incrementUnreadCountForOthers(ctx context.Context, channelID primitive.ObjectID, senderID primitive.ObjectID) {
 	members, err := uc.channelMemberRepo.GetChannelMembers(ctx, channelID)
 	if err != nil {
 		fmt.Printf("Failed to get channel members for unread count: %v\n", err)
@@ -451,10 +422,6 @@ func (uc *ChatUseCase) incrementUnreadCountForOthers(ctx context.Context, channe
 // Cleanup methods for background maintenance
 func (uc *ChatUseCase) CleanupExpiredEvents(ctx context.Context) error {
 	return uc.messageEventRepo.CleanupExpiredEvents(ctx)
-}
-
-func (uc *ChatUseCase) CleanupExpiredTyping(ctx context.Context) error {
-	return uc.typingIndicatorRepo.CleanupExpiredTyping(ctx)
 }
 
 // isInternalUser checks if the sender is an internal user to prevent loops
@@ -505,12 +472,12 @@ func (uc *ChatUseCase) findOrSyncUser(ctx context.Context, senderID string, vend
 		}
 
 		// Upsert user to database
-		if err := uc.userRepo.Upsert(ctx, user); err != nil {
+		if err := uc.userRepo.Create(ctx, user); err != nil {
 			return nil, fmt.Errorf("failed to upsert user: %w", err)
 		}
 
 		// Create chotot_id attribute after user is created
-		if err := uc.createUserAttribute(ctx, user.ID, "chotot_id", senderID); err != nil {
+		if err := uc.createUserAttribute(ctx, user.ID, "chotot_id", senderID, []string{"chotot", "link_id"}); err != nil {
 			log.Warnw(ctx, "Failed to create chotot_id attribute for user", "error", err, "user_id", user.ID.Hex())
 		}
 
@@ -545,12 +512,12 @@ func (uc *ChatUseCase) getUserAttributeByKeyAndValue(ctx context.Context, key, v
 }
 
 // createUserAttribute creates a user attribute
-func (uc *ChatUseCase) createUserAttribute(ctx context.Context, userID primitive.ObjectID, key, value string) error {
+func (uc *ChatUseCase) createUserAttribute(ctx context.Context, userID primitive.ObjectID, key, value string, tags []string) error {
 	attr := &models.UserAttribute{
 		UserID: userID,
 		Key:    key,
 		Value:  value,
-		Tags:   []string{},
+		Tags:   tags,
 	}
 
 	return uc.userAttributeRepo.Upsert(ctx, attr)

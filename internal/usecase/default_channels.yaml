@@ -5,7 +5,7 @@
   item_price: '18,500,000 VND'
   context: 'A buyer interested in buying a used iPhone 13 Pro. The phone is in excellent condition with original accessories.'
   type: 'direct'
-  owner_email: 'demo@example.com'
+  owner_email: 'demo@chotot.vn'
 
 - external_channel_id: 'demo_channel_002'
   name: 'Honda Civic 2019 - Low Mileage'
@@ -13,7 +13,7 @@
   item_price: '520,000,000 VND'
   context: 'A potential buyer asking about a Honda Civic 2019 with low mileage. Clean title, well maintained.'
   type: 'direct'
-  owner_email: 'demo@example.com'
+  owner_email: 'demo@chotot.vn'
 
 - external_channel_id: 'demo_channel_003'
   name: 'MacBook Air M2 - Like New'
@@ -21,7 +21,7 @@
   item_price: '25,000,000 VND'
   context: 'Customer inquiring about a MacBook Air M2 that is barely used, includes original box and charger.'
   type: 'direct'
-  owner_email: 'demo@example.com'
+  owner_email: 'demo@chotot.vn'
 
 - external_channel_id: 'demo_channel_004'
   name: 'Gaming Setup - Complete Build'
@@ -29,7 +29,7 @@
   item_price: '35,000,000 VND'
   context: 'Gaming enthusiast interested in a complete gaming setup including monitor, keyboard, and mouse.'
   type: 'direct'
-  owner_email: 'demo@example.com'
+  owner_email: 'demo@chotot.vn'
 
 - external_channel_id: 'demo_channel_005'
   name: 'Yamaha R3 2021 - Mint Condition'
@@ -37,7 +37,7 @@
   item_price: '95,000,000 VND'
   context: 'Young rider interested in purchasing a Yamaha R3 for weekend rides. Asking about maintenance history and modifications.'
   type: 'direct'
-  owner_email: 'demo@example.com'
+  owner_email: 'demo@chotot.vn'
 
 - external_channel_id: 'demo_channel_006'
   name: 'Canon EOS R5 Kit - Professional Camera'
@@ -45,7 +45,7 @@
   item_price: '65,000,000 VND'
   context: 'Professional photographer looking for a camera upgrade. Interested in shutter count and lens condition.'
   type: 'direct'
-  owner_email: 'demo@example.com'
+  owner_email: 'demo@chotot.vn'
 
 - external_channel_id: 'demo_channel_007'
   name: 'Apartment in District 1 - City View'
@@ -53,7 +53,7 @@
   item_price: '4,500,000,000 VND'
   context: 'Family looking to buy an apartment in District 1. Asking about building amenities and parking availability.'
   type: 'direct'
-  owner_email: 'demo@example.com'
+  owner_email: 'demo@chotot.vn'
 
 - external_channel_id: 'demo_channel_008'
   name: 'Louis Vuitton Neverfull MM - Authentic'
@@ -61,7 +61,7 @@
   item_price: '28,000,000 VND'
   context: 'Fashion enthusiast interested in authentic luxury bag. Asking about authenticity verification and purchase receipt.'
   type: 'direct'
-  owner_email: 'demo@example.com'
+  owner_email: 'demo@chotot.vn'
 
 - external_channel_id: 'demo_channel_009'
   name: 'Rolex Submariner - Investment Watch'
@@ -69,7 +69,7 @@
   item_price: '185,000,000 VND'
   context: 'Watch collector interested in a Rolex Submariner as investment. Asking about box, papers, and service history.'
   type: 'direct'
-  owner_email: 'demo@example.com'
+  owner_email: 'demo@chotot.vn'
 
 - external_channel_id: 'demo_channel_010'
   name: 'Wedding Dress - Designer Original'
@@ -77,7 +77,7 @@
   item_price: '15,000,000 VND'
   context: 'Bride-to-be looking for a designer wedding dress. Interested in alterations and dry cleaning history.'
   type: 'direct'
-  owner_email: 'demo@example.com'
+  owner_email: 'demo@chotot.vn'
 
 - external_channel_id: 'demo_channel_011'
   name: 'Vintage Vinyl Collection - Rare Records'
@@ -85,7 +85,7 @@
   item_price: '8,500,000 VND'
   context: 'Music enthusiast interested in vintage vinyl collection. Asking about specific albums and record condition.'
   type: 'direct'
-  owner_email: 'demo@example.com'
+  owner_email: 'demo@chotot.vn'
 
 - external_channel_id: 'demo_channel_012'
   name: 'Office Space in CBD - Prime Location'
@@ -93,4 +93,4 @@
   item_price: '45,000,000 VND/month'
   context: 'Startup company looking for office space rental. Asking about lease terms and included utilities.'
   type: 'direct'
-  owner_email: 'demo@example.com'
+  owner_email: 'demo@chotot.vn'

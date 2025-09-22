@@ -75,28 +75,6 @@ func (r *VendorRegistry) ListVendors() []VendorType {
 	return vendors
 }
 
-// DetectVendorFromChannelID attempts to detect vendor from channel ID patterns
-// This is a fallback method for channels without explicit vendor information
-func (r *VendorRegistry) DetectVendorFromChannelID(ctx context.Context, channelID string) (VendorType, error) {
-	if channelID == "" {
-		return "", fmt.Errorf("channel ID cannot be empty")
-	}
-
-	// Try pattern-based detection as fallback
-	detectedType := r.detectVendorByPattern(channelID)
-	if detectedType != "" {
-		log.Infow(ctx, "Detected vendor from channel ID pattern",
-			"channel_id", channelID,
-			"vendor_type", detectedType)
-		return detectedType, nil
-	}
-
-	// Default to Chotot for unknown patterns (backward compatibility)
-	log.Infow(ctx, "Unknown channel ID pattern, defaulting to Chotot",
-		"channel_id", channelID)
-	return VendorTypeChotot, nil
-}
-
 // detectVendorByPattern detects vendor based on channel ID patterns
 func (r *VendorRegistry) detectVendorByPattern(channelID string) VendorType {
 	// Facebook Messenger patterns

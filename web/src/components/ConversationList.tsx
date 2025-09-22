@@ -75,9 +75,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
           channels.map((channel) => (
             <div
               key={channel.id}
-              className={`conversation-list-item ${
-                selectedChannelId === channel.id ? 'active' : ''
-              }`}
+              className={`conversation-list-item ${selectedChannelId === channel.id ? 'active' : ''
+                }`}
               onClick={() => onChannelSelect(channel)}
             >
               <div className="flex items-start space-x-3">
@@ -100,27 +99,19 @@ const ConversationList: React.FC<ConversationListProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between mt-1">
+                    {/* {channel.last_message_at} */}
+
                     <div className="text-sm text-gray-500 truncate">
-                      {channel.item_name ? (
-                        <span>{channel.item_name}</span>
-                      ) : (
-                        <span>New conversation</span>
-                      )}
+                      <span>{channel.context}</span>
                     </div>
 
-                    {channel.unread_count && channel.unread_count > 0 && (
+
+                    {channel?.unread_count as any > 0 && (
                       <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
                         {channel.unread_count}
                       </span>
                     )}
                   </div>
-
-                  {/* Item details */}
-                  {channel.item_price && (
-                    <div className="text-xs text-gray-400 mt-1">
-                      {channel.item_price}
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

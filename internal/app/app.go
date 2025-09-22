@@ -69,9 +69,9 @@ func Invoke(funcs ...any) *fx.App {
 			mongodb.NewChannelMemberRepository,
 			mongodb.NewChatMessageRepository,
 			mongodb.NewMessageEventRepository,
-			mongodb.NewTypingIndicatorRepository,
 			mongodb.NewUnreadCountRepository,
 			mongodb.NewMessageDedupRepository,
+			mongodb.NewMigrationRepository,
 
 			// External Clients
 			chatapi.NewChatAPIClient,
@@ -95,6 +95,7 @@ func Invoke(funcs ...any) *fx.App {
 		),
 		fx.Supply(conf),
 		fx.Invoke(initializeUsers),
+		fx.Invoke(runDatabaseMigrations),
 		fx.Invoke(initializeChannels),
 		fx.Invoke(initializeProductServices),
 		fx.Invoke(initializeVendors),
@@ -158,6 +159,28 @@ func initializeChannels(
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			return usecase.AutoMigrateChannels(userRepo, channelRepo, channelMemberRepo, messageRepo)
+		},
+	})
+}
+
+// runDatabaseMigrations runs necessary database migrations on startup
+func runDatabaseMigrations(
+	lc fx.Lifecycle,
+	migrationRepo mongodb.MigrationRepository,
+) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			// Run channel migration to vendor model first
+			if err := migrationRepo.MigrateChannelsToVendorModel(ctx); err != nil {
+				return fmt.Errorf("failed to migrate channels to vendor model: %w", err)
+			}
+
+			// Run message migration to remove external_channel_id
+			if err := migrationRepo.MigrateChatMessagesToRemoveExternalChannelID(ctx); err != nil {
+				return fmt.Errorf("failed to migrate chat messages: %w", err)
+			}
+
+			return nil
 		},
 	})
 }
