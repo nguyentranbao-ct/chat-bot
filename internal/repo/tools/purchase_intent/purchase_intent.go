@@ -154,9 +154,10 @@ func (t *tool) sendPurchaseMessage(session toolsmanager.SessionContext, args Pur
 	defer cancel()
 
 	req := internal_api.SendMessageRequest{
-		ChannelID: session.GetChannelID().Hex(),
-		SenderID:  session.GetMerchantID().Hex(),
-		Content:   fmt.Sprintf(`[PURCHASE_INTENT %d%%] %s`, args.Percentage, args.Message),
+		ChannelID:  session.GetChannelID().Hex(),
+		SenderID:   session.GetMerchantID().Hex(),
+		SkipVendor: true,
+		Content:    fmt.Sprintf(`[PURCHASE_INTENT %d%%] %s`, args.Percentage, args.Message),
 	}
 
 	return t.internalAPIClient.SendMessage(ctx, req)

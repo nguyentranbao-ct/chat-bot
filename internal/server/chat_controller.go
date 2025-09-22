@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/internal_api"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
 	"github.com/nguyentranbao-ct/chat-bot/pkg/util"
 )
@@ -125,14 +126,8 @@ func (cc *chatController) SendMessage(c echo.Context) error {
 	return c.JSON(http.StatusCreated, message)
 }
 
-type SendInternalMessageRequest struct {
-	ChannelID string `json:"channel_id" validate:"required"`
-	SenderID  string `json:"sender_id" validate:"required"`
-	Content   string `json:"content" validate:"required"`
-}
-
 func (cc *chatController) SendInternalMessage(c echo.Context) error {
-	var req SendInternalMessageRequest
+	var req internal_api.SendMessageRequest
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
@@ -154,6 +149,7 @@ func (cc *chatController) SendInternalMessage(c echo.Context) error {
 		Content:     req.Content,
 		MessageType: "text",
 		Metadata:    map[string]interface{}{"source": "internal_api"},
+		SkipVendor:  req.SkipVendor,
 	}
 
 	message, err := cc.chatUsecase.SendMessage(ctx, params)

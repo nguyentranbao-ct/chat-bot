@@ -88,6 +88,7 @@ type SendMessageParams struct {
 	MessageType string                 `json:"message_type"`
 	Blocks      []models.MessageBlock  `json:"blocks,omitempty"`
 	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	SkipVendor  bool                   `json:"skip_vendor,omitempty"`
 }
 
 func (uc *ChatUseCase) SendMessage(ctx context.Context, params SendMessageParams) (*models.ChatMessage, error) {
@@ -139,8 +140,10 @@ func (uc *ChatUseCase) postProcessSentMessage(ctx context.Context, message *mode
 	// Create message event for real-time sync
 	uc.createMessageSentEvent(ctx, message, params)
 
-	// Send to external vendor asynchronously
-	uc.sendToExternalVendor(ctx, message, channel, params)
+	// Send to external vendor asynchronously, unless skipped
+	if !params.SkipVendor {
+		uc.sendToExternalVendor(ctx, message, channel, params)
+	}
 }
 
 // sendToExternalVendor sends the message to the external vendor

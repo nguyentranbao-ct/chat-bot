@@ -202,7 +202,6 @@ func (l *llmUsecase) buildPrompt(templateStr string, data *PromptData) (string, 
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
-	log.Info(context.Background(), "Generated prompt:\n"+buf.String())
 
 	return buf.String(), nil
 }
