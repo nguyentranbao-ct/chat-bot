@@ -41,17 +41,14 @@ export interface Room {
   updated_at: string;
   last_message_at?: string;
   is_archived: boolean;
-  unread_count?: number;
+  unread_count: number;
 }
 
-export interface RoomMember {
+export interface RoomMemberInfo {
   id: string;
-  room_id: string;
   user_id: string;
   role: string;
   joined_at: string;
-  left_at?: string;
-  is_active: boolean;
 }
 
 export interface MessageBlock {

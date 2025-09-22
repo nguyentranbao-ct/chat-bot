@@ -5,7 +5,7 @@ import {
   User,
   ProfileUpdateRequest,
   Room,
-  RoomMember,
+  RoomMemberInfo,
   ChatMessage,
   SendMessageRequest,
   MessageEvent,
@@ -79,8 +79,8 @@ class ApiClient {
     return response.data;
   }
 
-  async getRoomMembers(roomId: string): Promise<RoomMember[]> {
-    const response: AxiosResponse<RoomMember[]> = await this.client.get(
+  async getRoomMembers(roomId: string): Promise<RoomMemberInfo[]> {
+    const response: AxiosResponse<RoomMemberInfo[]> = await this.client.get(
       `/chat/rooms/${roomId}/members`,
     );
     return response.data;

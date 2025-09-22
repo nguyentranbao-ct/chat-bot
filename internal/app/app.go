@@ -68,11 +68,9 @@ func Invoke(funcs ...any) *fx.App {
 			mongodb.NewUserRepository,
 			mongodb.NewUserAttributeRepository,
 			mongodb.NewAuthTokenRepository,
-			mongodb.NewRoomRepository,
 			mongodb.NewRoomMemberRepository,
 			mongodb.NewChatMessageRepository,
 			mongodb.NewMessageEventRepository,
-			mongodb.NewUnreadCountRepository,
 			mongodb.NewMessageDedupRepository,
 
 			// repo clients

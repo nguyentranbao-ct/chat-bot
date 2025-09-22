@@ -28,10 +28,10 @@ const ChatPage: React.FC = () => {
   const [error, setError] = useState('');
 
   // Define callback functions first
-  const loadRooms = useCallback(async () => {
+  const loadRooms = useCallback(async (forceRefresh = false) => {
     try {
       const roomData = await api.getRooms();
-      setRooms(roomData || []); // Ensure it's always an array
+      setRooms(roomData || []);
     } catch (err: any) {
       console.error('Failed to load rooms:', err);
       setError('Failed to load conversations');
@@ -39,6 +39,11 @@ const ChatPage: React.FC = () => {
       setIsLoading(false);
     }
   }, []);
+
+  // Check if a room exists locally before refreshing
+  const findRoomById = useCallback((roomId: string) => {
+    return rooms.find(room => room.id === roomId);
+  }, [rooms]);
 
   const loadMessages = useCallback(async (roomId: string) => {
     try {
@@ -115,13 +120,24 @@ const ChatPage: React.FC = () => {
         return prev;
       });
 
-      // Refresh rooms list to update last message
-      setRooms(prev => {
-        api.getRooms().then(roomData => {
-          if (roomData) setRooms(roomData);
-        }).catch(console.error);
-        return prev;
-      });
+      // Optimized refresh logic: only refresh if this is a new channel
+      const existingRoom = findRoomById(message.room_id);
+      if (!existingRoom) {
+        // This is a new channel, refresh the entire list
+        console.log('New channel detected, refreshing room list');
+        loadRooms(true);
+      } else {
+        // Update last message info for existing room without full refresh
+        setRooms(prev => prev.map(room =>
+          room.id === message.room_id
+            ? {
+                ...room,
+                last_message_at: message.created_at,
+                unread_count: selectedRoom?.id === message.room_id ? 0 : room.unread_count + 1
+              }
+            : room
+        ));
+      }
     };
 
     const handleMessageSent = (message: ChatMessage) => {
@@ -135,6 +151,13 @@ const ChatPage: React.FC = () => {
         }
         return prev;
       });
+
+      // Update room data for sent messages (typically from current user)
+      setRooms(prev => prev.map(room =>
+        room.id === message.room_id
+          ? { ...room, last_message_at: message.created_at }
+          : room
+      ));
     };
 
     const handleTypingStart = (typing: TypingIndicator) => {
@@ -163,7 +186,7 @@ const ChatPage: React.FC = () => {
         socket.offTypingStop(handleTypingStop);
       };
     }
-  }, [selectedRoom?.id, user?.id, socket.isConnected]);
+  }, [selectedRoom?.id, user?.id, socket.isConnected, findRoomById, loadRooms]);
 
   // Join/leave rooms when selection changes
   useEffect(() => {
@@ -184,13 +207,13 @@ const ChatPage: React.FC = () => {
     }
   }, [selectedRoom]);
 
-  const handleRoomSelect = (room: Room) => {
+  const handleRoomSelect = useCallback((room: Room) => {
     setSelectedRoom(room);
     setMessages([]);
     setIsTyping(false);
     // Update URL to include room ID
     navigate(`/chat/${room.id}`);
-  };
+  }, [navigate]);
 
   const handleLogout = async () => {
     try {

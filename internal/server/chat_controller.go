@@ -41,9 +41,15 @@ func (cc *chatController) GetRooms(c echo.Context) error {
 	user := c.Get("user").(*models.User)
 
 	ctx := c.Request().Context()
-	rooms, err := cc.chatUsecase.GetUserRooms(ctx, user.ID)
+	roomMembers, err := cc.chatUsecase.GetUserRooms(ctx, user.ID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	// Convert RoomMembers to client-facing Room objects
+	rooms := make([]*models.Room, len(roomMembers))
+	for i, roomMember := range roomMembers {
+		rooms[i] = roomMember.ToRoom()
 	}
 
 	return c.JSON(http.StatusOK, rooms)
@@ -57,12 +63,18 @@ func (cc *chatController) GetRoomMembers(c echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	members, err := cc.chatUsecase.GetRoomMembers(ctx, roomID)
+	members, err := cc.chatUsecase.GetRoomMembersByRoomID(ctx, roomID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	return c.JSON(http.StatusOK, members)
+	// Convert to basic member info for clients
+	memberInfos := make([]*models.RoomMemberInfo, len(members))
+	for i, member := range members {
+		memberInfos[i] = member.ToRoomMemberInfo()
+	}
+
+	return c.JSON(http.StatusOK, memberInfos)
 }
 
 type SendMessageRequest struct {
@@ -106,7 +118,7 @@ func (cc *chatController) SendMessage(c echo.Context) error {
 		ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
 		defer cancel()
 
-		members, err := cc.chatUsecase.GetRoomMembers(ctx, roomID)
+		members, err := cc.chatUsecase.GetRoomMembersByRoomID(ctx, roomID)
 		if err != nil {
 			fmt.Printf("Failed to get room members for socket broadcast: %v\n", err)
 			return
@@ -158,7 +170,7 @@ func (cc *chatController) SendInternalMessage(c echo.Context) error {
 		ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
 		defer cancel()
 
-		members, err := cc.chatUsecase.GetRoomMembers(ctx, roomID)
+		members, err := cc.chatUsecase.GetRoomMembersByRoomID(ctx, roomID)
 		if err != nil {
 			fmt.Printf("Failed to get room members for internal message broadcast: %v\n", err)
 			return

@@ -49,14 +49,14 @@ type PromptContext struct {
 	MerchantID primitive.ObjectID
 	BuyerID    primitive.ObjectID
 
-	Room           *models.Room
+	RoomMember     *models.RoomMember
 	Message        string
 	RecentMessages *models.MessageHistory
 }
 
 type PromptData struct {
-	Room    *models.Room
-	Message string
+	RoomMember *models.RoomMember
+	Message    string
 }
 
 // ProcessMessage processes a message with early validation and deferred expensive operations
@@ -81,8 +81,8 @@ func (l *llmUsecase) ProcessMessage(ctx context.Context, chatMode *models.ChatMo
 
 	// PHASE 3: Build prompt - only after validation passes
 	prompt, err := l.buildPrompt(chatMode.PromptTemplate, &PromptData{
-		Room:    data.Room,
-		Message: data.Message,
+		RoomMember: data.RoomMember,
+		Message:    data.Message,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to build prompt: %w", err)
@@ -162,7 +162,7 @@ func (l *llmUsecase) createSessionContext(ctx context.Context, data *PromptConte
 	session := toolsmanager.NewSessionContext(ctx, toolsmanager.SessionContextConfig{
 		Genkit:      gk,
 		SessionID:   data.SessionID,
-		RoomID:      data.Room.ID,
+		RoomID:      data.RoomMember.RoomID,
 		SessionRepo: l.sessionRepo,
 		BuyerID:     data.BuyerID,
 		MerchantID:  data.MerchantID,

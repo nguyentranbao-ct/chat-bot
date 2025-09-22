@@ -30,6 +30,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
     return date.toLocaleDateString();
   };
 
+
   return (
     <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
       {/* Header */}
@@ -99,15 +100,19 @@ const ConversationList: React.FC<ConversationListProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between mt-1">
-                    {/* {room.last_message_at} */}
-
-                    <div className="text-sm text-gray-500 truncate">
+                    <div className="text-sm text-gray-500 truncate flex-1 mr-2">
                       <span>{room.context}</span>
+                      {/* Show item info if available */}
+                      {room.item_name && (
+                        <span className="text-xs text-gray-400 block">
+                          📦 {room.item_name}
+                          {room.item_price && ` - ${room.item_price}`}
+                        </span>
+                      )}
                     </div>
 
-
-                    {room?.unread_count as any > 0 && (
-                      <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                    {room.unread_count > 0 && (
+                      <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full flex-shrink-0">
                         {room.unread_count}
                       </span>
                     )}
