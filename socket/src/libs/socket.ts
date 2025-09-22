@@ -10,14 +10,13 @@ export const getQuery = (socket: Socket, key: string) => {
   return Array.isArray(query) ? query[0] : query;
 };
 
-export const getUserKeyRoom = (projectId: string, userKey: string) => {
-  return `p:${projectId}:uk:${userKey}`;
+export const getUserKeyRoom = (userKey: string) => {
+  return `uk:${userKey}`;
 };
 
 export const getUserPlatformRoom = (
-  projectId: string,
   userKey: string,
   platform: string,
 ) => {
-  return `p:${projectId}:uk:${userKey}:plf:${platform}`;
+  return `uk:${userKey}:plf:${platform}`;
 };

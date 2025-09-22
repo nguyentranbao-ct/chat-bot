@@ -17,7 +17,16 @@ import (
 
 const (
 	ToolName        = "PurchaseIntent"
-	ToolDescription = "Logs purchase intent when a user shows buying interest with a percentage confidence level"
+	ToolDescription = `Logs purchase intent when a user shows buying interest with a percentage confidence level. Only trigger PurchaseIntent when the customer demonstrates CLEAR, EXPLICIT purchase intent with specific indicators:
+- Direct purchase statements: "I want to buy this", "I'll take it", "How do I purchase this", "Add to cart", "I'm ready to buy"
+- Payment-related questions: "What payment methods do you accept?", "How much is shipping?", "What's the total cost?"
+- Commitment language: "I've decided to get this", "This is exactly what I need", "I'm convinced"
+- Urgency indicators: "When can I get this?", "How fast can you ship this?"
+
+When you do detect genuine purchase intent:
+1. Call PurchaseIntent to log the purchase intent
+2. IMMEDIATELY follow with ReplyMessage to acknowledge their decision and guide them to next steps
+`
 )
 
 // PurchaseIntentArgs defines the arguments for the PurchaseIntent tool

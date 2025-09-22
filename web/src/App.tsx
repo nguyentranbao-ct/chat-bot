@@ -38,6 +38,14 @@ const App: React.FC = () => {
               }
             />
             <Route
+              path="/chat/:channelId"
+              element={
+                <ProtectedRoute>
+                  <ChatPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/"
               element={<Navigate to={isAuthenticated() ? "/chat" : "/login"} replace />}
             />

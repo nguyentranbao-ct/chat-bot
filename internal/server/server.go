@@ -39,9 +39,6 @@ func StartServer(
 			if c.Get("user_id") != nil {
 				args = append(args, "user_id", c.Get("user_id"))
 			}
-			if c.Get("project_id") != nil {
-				args = append(args, "project_id", c.Get("project_id"))
-			}
 			return args
 		},
 	}
@@ -59,9 +56,9 @@ func StartServer(
 
 	// CORS middleware to allow web frontend access
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"http://localhost:3000", "http://127.0.0.1:3000"},
-		AllowMethods: []string{echo.GET, echo.PUT, echo.POST, echo.DELETE, echo.OPTIONS},
-		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
+		AllowOrigins:     []string{"http://localhost:3000", "http://127.0.0.1:3000"},
+		AllowMethods:     []string{echo.GET, echo.PUT, echo.POST, echo.DELETE, echo.OPTIONS},
+		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
 		AllowCredentials: true,
 	}))
 

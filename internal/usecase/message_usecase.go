@@ -56,7 +56,7 @@ func (uc *messageUsecase) ProcessMessage(ctx context.Context, message models.Inc
 
 	// Skip processing if message is from seller (bot acts as seller, so this prevents loops)
 	if senderRole == "seller" {
-		log.Infof(ctx, "Skipping message from seller %s in channel %s to prevent bot loops", message.SenderID, message.ChannelID)
+		log.Infof(ctx, "Skipping message from seller", message.SenderID, message.ChannelID)
 		return nil
 	}
 

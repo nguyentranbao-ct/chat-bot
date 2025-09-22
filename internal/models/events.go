@@ -5,9 +5,8 @@ import (
 )
 
 type Event struct {
-	ID        ObjectID `bson:"_id,omitempty"`
-	ProjectID ObjectID `bson:"project_id,omitempty"`
-	Name      string   `bson:"name,omitempty"`
+	ID   ObjectID `bson:"_id,omitempty"`
+	Name string   `bson:"name,omitempty"`
 	// Payload   map[string]any `bson:"payload,omitempty"`
 
 	CreatedAt time.Time `bson:"created_at,omitempty"`

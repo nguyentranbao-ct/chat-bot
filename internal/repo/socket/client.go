@@ -19,11 +19,10 @@ type Client struct {
 }
 
 type Event struct {
-	ProjectID string      `json:"project_id"`
-	UserKey   string      `json:"user_key"`
-	Platform  string      `json:"platform,omitempty"`
-	Name      string      `json:"name"`
-	Data      interface{} `json:"data"`
+	UserID   string      `json:"user_id"`
+	Platform string      `json:"platform,omitempty"`
+	Name     string      `json:"name"`
+	Data     interface{} `json:"data"`
 }
 
 type SendEventsRequest struct {
@@ -89,104 +88,193 @@ func (c *Client) SendEvents(ctx context.Context, events []Event) error {
 	return nil
 }
 
-// BroadcastMessage sends a message_received event to a specific channel
-// For now, this uses channel-based rooms, but should be updated to send to specific users
-func (c *Client) BroadcastMessage(ctx context.Context, projectID, channelID string, message *models.ChatMessage) error {
-	// Use channel ID as the user_key for channel-based rooms
-	// In a production system, you'd want to get the list of channel members
-	// and send individual events to each user using BroadcastMessageToUsers
-	event := Event{
-		ProjectID: projectID,
-		UserKey:   fmt.Sprintf("channel_%s", channelID),
-		Platform:  "web",
-		Name:      "message_received",
-		Data:      message,
-	}
+type BroadcastMessageArgs struct {
+	ChannelID string
+	Message   *models.ChatMessage
+}
 
-	return c.SendEvents(ctx, []Event{event})
+// BroadcastMessage sends a message_received event to a specific channel
+// This method is deprecated and should not be used - use BroadcastMessageToUsers instead
+func (c *Client) BroadcastMessage(ctx context.Context, args BroadcastMessageArgs) error {
+	// This method is deprecated - channel-based broadcasting should not be used
+	// Instead, get channel members and use BroadcastMessageToUsers
+	return fmt.Errorf("BroadcastMessage is deprecated - use BroadcastMessageToUsers instead")
+}
+
+type BroadcastMessageSentArgs struct {
+	UserID  string
+	Message *models.ChatMessage
 }
 
 // BroadcastMessageSent sends a message_sent confirmation to the sender
-func (c *Client) BroadcastMessageSent(ctx context.Context, projectID, userID string, message *models.ChatMessage) error {
+func (c *Client) BroadcastMessageSent(ctx context.Context, args BroadcastMessageSentArgs) error {
 	event := Event{
-		ProjectID: projectID,
-		UserKey:   userID,
-		Platform:  "web",
-		Name:      "message_sent",
-		Data:      message,
+		UserID:   args.UserID,
+		Platform: "web",
+		Name:     "message_sent",
+		Data:     args.Message,
 	}
 
 	return c.SendEvents(ctx, []Event{event})
+}
+
+type BroadcastTypingArgs struct {
+	ChannelID string
+	UserID    string
+	IsTyping  bool
 }
 
 // BroadcastTyping sends typing indicator to channel members
-func (c *Client) BroadcastTyping(ctx context.Context, projectID, channelID, userID string, isTyping bool) error {
-	eventName := "user_typing_stop"
-	if isTyping {
-		eventName = "user_typing_start"
-	}
+// This method is deprecated and should not be used - use BroadcastTypingToUsers instead
+func (c *Client) BroadcastTyping(ctx context.Context, args BroadcastTypingArgs) error {
+	// This method is deprecated - channel-based broadcasting should not be used
+	// Instead, get channel members and use BroadcastTypingToUsers
+	return fmt.Errorf("BroadcastTyping is deprecated - use BroadcastTypingToUsers instead")
+}
 
-	event := Event{
-		ProjectID: projectID,
-		UserKey:   fmt.Sprintf("channel_%s", channelID),
-		Platform:  "web",
-		Name:      eventName,
-		Data: map[string]interface{}{
-			"user_id":    userID,
-			"channel_id": channelID,
-			"is_typing":  isTyping,
-		},
-	}
-
-	return c.SendEvents(ctx, []Event{event})
+type BroadcastUserJoinedArgs struct {
+	ChannelID string
+	UserID    string
 }
 
 // BroadcastUserJoined notifies channel members when a user joins
-func (c *Client) BroadcastUserJoined(ctx context.Context, projectID, channelID, userID string) error {
-	event := Event{
-		ProjectID: projectID,
-		UserKey:   fmt.Sprintf("channel_%s", channelID),
-		Platform:  "web",
-		Name:      "user_joined",
-		Data: map[string]interface{}{
-			"user_id":    userID,
-			"channel_id": channelID,
-		},
-	}
+// This method is deprecated and should not be used - use BroadcastUserJoinedToUsers instead
+func (c *Client) BroadcastUserJoined(ctx context.Context, args BroadcastUserJoinedArgs) error {
+	// This method is deprecated - channel-based broadcasting should not be used
+	// Instead, get channel members and use BroadcastUserJoinedToUsers
+	return fmt.Errorf("BroadcastUserJoined is deprecated - use BroadcastUserJoinedToUsers instead")
+}
 
-	return c.SendEvents(ctx, []Event{event})
+type BroadcastUserLeftArgs struct {
+	ChannelID string
+	UserID    string
 }
 
 // BroadcastUserLeft notifies channel members when a user leaves
-func (c *Client) BroadcastUserLeft(ctx context.Context, projectID, channelID, userID string) error {
-	event := Event{
-		ProjectID: projectID,
-		UserKey:   fmt.Sprintf("channel_%s", channelID),
-		Platform:  "web",
-		Name:      "user_left",
-		Data: map[string]interface{}{
-			"user_id":    userID,
-			"channel_id": channelID,
-		},
-	}
+// This method is deprecated and should not be used - use BroadcastUserLeftToUsers instead
+func (c *Client) BroadcastUserLeft(ctx context.Context, args BroadcastUserLeftArgs) error {
+	// This method is deprecated - channel-based broadcasting should not be used
+	// Instead, get channel members and use BroadcastUserLeftToUsers
+	return fmt.Errorf("BroadcastUserLeft is deprecated - use BroadcastUserLeftToUsers instead")
+}
 
-	return c.SendEvents(ctx, []Event{event})
+type BroadcastMessageToUsersArgs struct {
+	UserIDs []string
+	Message *models.ChatMessage
 }
 
 // BroadcastMessageToUsers sends a message_received event to a list of specific users
-func (c *Client) BroadcastMessageToUsers(ctx context.Context, projectID string, userIDs []string, message *models.ChatMessage) error {
-	if len(userIDs) == 0 {
+func (c *Client) BroadcastMessageToUsers(ctx context.Context, args BroadcastMessageToUsersArgs) error {
+	if len(args.UserIDs) == 0 {
 		return nil
 	}
 
-	events := make([]Event, 0, len(userIDs))
-	for _, userID := range userIDs {
+	events := make([]Event, 0, len(args.UserIDs))
+	for _, userID := range args.UserIDs {
 		event := Event{
-			ProjectID: projectID,
-			UserKey:   userID, // Send directly to each user
-			Platform:  "web",
-			Name:      "message_received",
-			Data:      message,
+			UserID:   userID,
+			Platform: "web",
+			Name:     "message_received",
+			Data:     args.Message,
+		}
+		events = append(events, event)
+	}
+
+	return c.SendEvents(ctx, events)
+}
+
+type BroadcastTypingToUsersArgs struct {
+	UserIDs      []string
+	ChannelID    string
+	TypingUserID string
+	IsTyping     bool
+}
+
+// BroadcastTypingToUsers sends typing indicator to specific users
+func (c *Client) BroadcastTypingToUsers(ctx context.Context, args BroadcastTypingToUsersArgs) error {
+	if len(args.UserIDs) == 0 {
+		return nil
+	}
+
+	eventName := "user_typing_stop"
+	if args.IsTyping {
+		eventName = "user_typing_start"
+	}
+
+	events := make([]Event, 0, len(args.UserIDs))
+	for _, userID := range args.UserIDs {
+		// Don't send typing indicator to the user who is typing
+		if userID == args.TypingUserID {
+			continue
+		}
+
+		event := Event{
+			UserID:   userID,
+			Platform: "web",
+			Name:     eventName,
+			Data: map[string]interface{}{
+				"user_id":    args.TypingUserID,
+				"channel_id": args.ChannelID,
+				"is_typing":  args.IsTyping,
+			},
+		}
+		events = append(events, event)
+	}
+
+	return c.SendEvents(ctx, events)
+}
+
+type BroadcastUserJoinedToUsersArgs struct {
+	UserIDs      []string
+	ChannelID    string
+	JoinedUserID string
+}
+
+// BroadcastUserJoinedToUsers notifies specific users when a user joins
+func (c *Client) BroadcastUserJoinedToUsers(ctx context.Context, args BroadcastUserJoinedToUsersArgs) error {
+	if len(args.UserIDs) == 0 {
+		return nil
+	}
+
+	events := make([]Event, 0, len(args.UserIDs))
+	for _, userID := range args.UserIDs {
+		event := Event{
+			UserID:   userID,
+			Platform: "web",
+			Name:     "user_joined",
+			Data: map[string]interface{}{
+				"user_id":    args.JoinedUserID,
+				"channel_id": args.ChannelID,
+			},
+		}
+		events = append(events, event)
+	}
+
+	return c.SendEvents(ctx, events)
+}
+
+type BroadcastUserLeftToUsersArgs struct {
+	UserIDs    []string
+	ChannelID  string
+	LeftUserID string
+}
+
+// BroadcastUserLeftToUsers notifies specific users when a user leaves
+func (c *Client) BroadcastUserLeftToUsers(ctx context.Context, args BroadcastUserLeftToUsersArgs) error {
+	if len(args.UserIDs) == 0 {
+		return nil
+	}
+
+	events := make([]Event, 0, len(args.UserIDs))
+	for _, userID := range args.UserIDs {
+		event := Event{
+			UserID:   userID,
+			Platform: "web",
+			Name:     "user_left",
+			Data: map[string]interface{}{
+				"user_id":    args.LeftUserID,
+				"channel_id": args.ChannelID,
+			},
 		}
 		events = append(events, event)
 	}

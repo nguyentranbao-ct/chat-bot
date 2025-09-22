@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import ConversationList from '../components/ConversationList';
 import ChatWindow from '../components/ChatWindow';
@@ -16,6 +16,7 @@ import {
 
 const ChatPage: React.FC = () => {
   const navigate = useNavigate();
+  const { channelId } = useParams<{ channelId?: string }>();
   const socket = useSocket();
 
   const [user, setUser] = useState<User | null>(null);
@@ -40,11 +41,13 @@ const ChatPage: React.FC = () => {
   }, []);
 
   const loadMessages = useCallback(async (channelId: string) => {
-    console.log('Loading messages for channel:', channelId);
     try {
       const messageData = await api.getChannelMessages(channelId);
-      console.log('Messages loaded:', messageData?.length || 0);
-      setMessages(messageData || []); // Ensure it's always an array
+      // Sort messages by created_at to ensure proper ordering (oldest first)
+      const sortedMessages = (messageData || []).sort((a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      setMessages(sortedMessages);
     } catch (err: any) {
       console.error('Failed to load messages:', err);
       setError('Failed to load messages');
@@ -56,8 +59,8 @@ const ChatPage: React.FC = () => {
     if (!selectedChannel || !user) return;
 
     try {
-      const message = await api.sendMessage(selectedChannel.id, request);
-      setMessages((prev) => [...prev, message]);
+      await api.sendMessage(selectedChannel.id, request);
+      // Don't add message to local state - let socket handle it to prevent duplicates
       // Don't call loadChannels here - let socket handle updates
     } catch (err: any) {
       console.error('Failed to send message:', err);
@@ -85,7 +88,17 @@ const ChatPage: React.FC = () => {
 
     setUser(storedUser);
     loadChannels();
-  }, [navigate]);
+  }, [navigate, loadChannels]);
+
+  // Handle URL channel parameter
+  useEffect(() => {
+    if (channelId && channels.length > 0) {
+      const channel = channels.find(c => c.id === channelId);
+      if (channel && (!selectedChannel || selectedChannel.id !== channelId)) {
+        setSelectedChannel(channel);
+      }
+    }
+  }, [channelId, channels, selectedChannel]);
 
   // Set up socket listeners - stable references to avoid re-renders
   useEffect(() => {
@@ -93,7 +106,11 @@ const ChatPage: React.FC = () => {
       setMessages((prev) => {
         // Only add if it's for current channel and not already exists
         if (selectedChannel?.id === message.channel_id && !prev.find(m => m.id === message.id)) {
-          return [...prev, message];
+          const newMessages = [...prev, message];
+          // Sort messages to maintain chronological order
+          return newMessages.sort((a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
         }
         return prev;
       });
@@ -110,7 +127,11 @@ const ChatPage: React.FC = () => {
     const handleMessageSent = (message: ChatMessage) => {
       setMessages((prev) => {
         if (selectedChannel?.id === message.channel_id && !prev.find(m => m.id === message.id)) {
-          return [...prev, message];
+          const newMessages = [...prev, message];
+          // Sort messages to maintain chronological order
+          return newMessages.sort((a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
         }
         return prev;
       });
@@ -147,8 +168,6 @@ const ChatPage: React.FC = () => {
   // Join/leave channels when selection changes
   useEffect(() => {
     if (selectedChannel) {
-      console.log('Channel changed to:', selectedChannel.id, 'Socket connected:', socket.isConnected);
-
       // Only load messages, don't depend on socket connection for this
       loadMessages(selectedChannel.id);
 
@@ -169,6 +188,8 @@ const ChatPage: React.FC = () => {
     setSelectedChannel(channel);
     setMessages([]);
     setIsTyping(false);
+    // Update URL to include channel ID
+    navigate(`/chat/${channel.id}`);
   };
 
   const handleLogout = async () => {

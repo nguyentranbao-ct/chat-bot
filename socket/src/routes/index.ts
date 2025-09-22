@@ -14,8 +14,7 @@ const validateSendEvents = ajv.compile(
     {
       events: Type.Array(
         Type.Object({
-          project_id: Type.String(),
-          user_key: Type.String(),
+          user_id: Type.String(),
           platform: Type.Optional(Type.String()),
           name: Type.String(),
           data: Type.Any(),
@@ -28,13 +27,13 @@ const validateSendEvents = ajv.compile(
 );
 
 router
-  .get('/health', ctx => {
+  .get('/health', (ctx) => {
     ctx.body = { status: 'ok' };
   })
-  .get('/metrics', async ctx => {
+  .get('/metrics', async (ctx) => {
     ctx.body = await getMetrics();
   })
-  .post('/v1/events', async ctx => {
+  .post('/v1/events', async (ctx) => {
     const valid = validateSendEvents(ctx.request.body);
     if (!valid) {
       ctx.status = 400;
@@ -48,8 +47,8 @@ router
     const { events } = ctx.request.body;
     for (const e of events) {
       const room = e.platform
-        ? getUserPlatformRoom(e.project_id, e.user_key, e.platform)
-        : getUserKeyRoom(e.project_id, e.user_key);
+        ? getUserPlatformRoom(e.user_id, e.platform)
+        : getUserKeyRoom(e.user_id);
       ioEvents.to(room).emit(e.name, e.data);
     }
     ctx.body = { success: true };

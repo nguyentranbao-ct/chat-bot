@@ -41,7 +41,6 @@ ioEvents.on('connection', async (s) => {
   const socket = <ISocket>s;
   const profile = {
     sid: socket.id,
-    project_id: socket.$projectId,
     platform: socket.$platform,
     user_id: socket.$userId,
     device_id: socket.$deviceId,
@@ -58,9 +57,8 @@ ioEvents.on('connection', async (s) => {
   });
   socketMetrics(socket);
 
-  const selfRoom = getUserKeyRoom(socket.$projectId, socket.$userKey);
+  const selfRoom = getUserKeyRoom(socket.$userKey);
   const platformRoom = getUserPlatformRoom(
-    socket.$projectId,
     socket.$userKey,
     socket.$platform,
   );

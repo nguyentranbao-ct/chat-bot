@@ -1,8 +1,8 @@
 import io from 'socket.io-client';
 
-const socketServer = process.env.SOCKET_SERVER_URL || 'http://localhost:7070/events';
+const socketServer =
+  process.env.SOCKET_SERVER_URL || 'http://localhost:7070/events';
 const apiKey = process.env.SOCKET_API_KEY || 'x';
-const projectId = process.env.PROJECT_ID || 'p';
 const userId = process.env.USER_ID || 'u';
 const platform = process.env.PLATFORM || 'web';
 const fingerprint = process.env.FINGERPRINT || 'f';
@@ -20,7 +20,6 @@ function main(socketServer) {
       device_id: deviceId,
     },
     extraHeaders: {
-      'x-project-id': projectId,
       'x-platform': platform,
     },
   });

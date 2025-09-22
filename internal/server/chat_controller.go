@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -94,7 +95,20 @@ func (cc *chatController) SendMessage(c echo.Context) error {
 	}
 
 	// Broadcast message to all channel members via socket
-	cc.socketBroadcaster.BroadcastMessage(channelID.Hex(), message)
+	go func() {
+		members, err := cc.chatUsecase.GetChannelMembers(ctx, channelID)
+		if err != nil {
+			fmt.Printf("Failed to get channel members for socket broadcast: %v\n", err)
+			return
+		}
+
+		userIDs := make([]string, 0, len(members))
+		for _, member := range members {
+			userIDs = append(userIDs, member.UserID)
+		}
+
+		cc.socketBroadcaster.BroadcastMessageToUsers(userIDs, message)
+	}()
 
 	// Send confirmation to sender
 	cc.socketBroadcaster.BroadcastMessageSent(user.ID.Hex(), message)
@@ -223,8 +237,21 @@ func (cc *chatController) SetTyping(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	// Broadcast typing status to channel via socket
-	cc.socketBroadcaster.BroadcastTyping(channelID.Hex(), user.ID.Hex(), req.IsTyping)
+	// Broadcast typing status to channel members via socket
+	go func() {
+		members, err := cc.chatUsecase.GetChannelMembers(ctx, channelID)
+		if err != nil {
+			fmt.Printf("Failed to get channel members for typing broadcast: %v\n", err)
+			return
+		}
+
+		userIDs := make([]string, 0, len(members))
+		for _, member := range members {
+			userIDs = append(userIDs, member.UserID)
+		}
+
+		cc.socketBroadcaster.BroadcastTypingToUsers(userIDs, channelID.Hex(), user.ID.Hex(), req.IsTyping)
+	}()
 
 	return c.JSON(http.StatusOK, map[string]string{
 		"status": "success",

@@ -27,6 +27,8 @@ type SocketBroadcaster interface {
 	BroadcastMessage(channelID string, message *models.ChatMessage)
 	BroadcastMessageSent(userID string, message *models.ChatMessage)
 	BroadcastTyping(channelID, userID string, isTyping bool)
+	BroadcastMessageToUsers(userIDs []string, message *models.ChatMessage)
+	BroadcastTypingToUsers(userIDs []string, channelID, userID string, isTyping bool)
 }
 
 func NewChatUseCase(
@@ -210,7 +212,20 @@ func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage 
 
 	// Broadcast incoming message to all channel members via socket
 	if uc.socketHandler != nil {
-		uc.socketHandler.BroadcastMessage(channel.ID.Hex(), message)
+		go func() {
+			members, err := uc.channelMemberRepo.GetChannelMembers(context.Background(), channel.ID)
+			if err != nil {
+				fmt.Printf("Failed to get channel members for socket broadcast: %v\n", err)
+				return
+			}
+
+			userIDs := make([]string, 0, len(members))
+			for _, member := range members {
+				userIDs = append(userIDs, member.UserID)
+			}
+
+			uc.socketHandler.BroadcastMessageToUsers(userIDs, message)
+		}()
 	}
 
 	return nil

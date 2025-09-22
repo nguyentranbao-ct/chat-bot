@@ -1,22 +1,27 @@
 import { log } from '@/libs/logger';
-import { requestDurationSeconds, socketActiveConnections } from '@/libs/metrics';
+import {
+  requestDurationSeconds,
+  socketActiveConnections,
+} from '@/libs/metrics';
 import { getHeader, getQuery } from '@/libs/socket';
 import { ISocket } from '@/types/socket';
 import { Event, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret-key-change-this-in-production';
+const JWT_SECRET =
+  process.env.JWT_SECRET || 'your-jwt-secret-key-change-this-in-production';
 
 export const authSocket = (s: Socket, next: (err?: Error) => void) => {
   const socket = <ISocket>s;
 
   // Extract JWT token from Authorization header or query parameter
-  const token = getHeader(socket, 'authorization')?.replace('Bearer ', '') || getQuery(socket, 'token');
+  const token =
+    getHeader(socket, 'authorization')?.replace('Bearer ', '') ||
+    getQuery(socket, 'token');
 
   const meta: Record<string, string | undefined> = {
     sid: socket.id,
-    project_id: getHeader(socket, 'x-project-id'),
-    platform: getHeader(socket, 'x-platform'),
+    platform: getHeader(socket, 'x-platform') || getQuery(socket, 'platform'),
     device_id: getQuery(socket, 'device_id'),
     fingerprint: getQuery(socket, 'fingerprint'),
   };
@@ -40,16 +45,12 @@ export const authSocket = (s: Socket, next: (err?: Error) => void) => {
       withErr('invalid JWT token: missing user id');
       return;
     }
-  } catch (err) {
-    withErr(`invalid JWT token: ${err.message}`);
+  } catch (err: any) {
+    withErr(`invalid JWT token: ${err?.message || String(err)}`);
     return;
   }
 
-  if (!meta.project_id) {
-    withErr('invalid project id');
-    return;
-  }
-  if (!meta.platform) {
+  if (!meta.platform || meta.platform.trim() === '') {
     withErr('invalid platform');
     return;
   }
@@ -62,7 +63,6 @@ export const authSocket = (s: Socket, next: (err?: Error) => void) => {
     return;
   }
 
-  socket.$projectId = meta.project_id;
   socket.$platform = meta.platform;
   socket.$fingerprint = meta.fingerprint;
   socket.$deviceId = meta.device_id;
@@ -73,7 +73,6 @@ export const authSocket = (s: Socket, next: (err?: Error) => void) => {
 
 export const socketMetrics = (socket: ISocket) => {
   const labels = {
-    project: socket.$projectId,
     platform: socket.$platform,
   };
   socketActiveConnections.inc(labels);

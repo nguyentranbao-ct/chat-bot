@@ -7,7 +7,6 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
-	"github.com/nguyentranbao-ct/chat-bot/internal/kafka"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chotot"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
@@ -88,10 +87,9 @@ func Invoke(funcs ...any) *fx.App {
 			list_products.NewTool,
 		),
 		fx.Supply(conf),
-		fx.Invoke(InitializeUsers),
-		fx.Invoke(InitializeChannels),
-		fx.Invoke(InitializeProductServices),
-		fx.Invoke(kafka.StartConsumeMessages),
+		fx.Invoke(initializeUsers),
+		fx.Invoke(initializeChannels),
+		fx.Invoke(initializeProductServices),
 		fx.Invoke(funcs...),
 	)
 }
@@ -108,12 +106,12 @@ func newJWTSecret(cfg *config.Config) string {
 	return cfg.JWT.Secret
 }
 
-func newSocketBroadcaster(client *socket.Client, cfg *config.Config) usecase.SocketBroadcaster {
-	return socket.NewBroadcaster(client, cfg.ChatAPI.ProjectID)
+func newSocketBroadcaster(client *socket.Client) usecase.SocketBroadcaster {
+	return socket.NewBroadcaster(client)
 }
 
-// InitializeProductServices registers all product services with the registry using fx lifecycle
-func InitializeProductServices(
+// initializeProductServices registers all product services with the registry using fx lifecycle
+func initializeProductServices(
 	lc fx.Lifecycle,
 	client chotot.Client,
 	registry list_products.ProductServiceRegistry,
@@ -128,8 +126,8 @@ func InitializeProductServices(
 	})
 }
 
-// InitializeUsers initializes default users and attributes on startup
-func InitializeUsers(
+// initializeUsers initializes default users and attributes on startup
+func initializeUsers(
 	lc fx.Lifecycle,
 	userRepo mongodb.UserRepository,
 	userAttrRepo mongodb.UserAttributeRepository,
@@ -141,8 +139,8 @@ func InitializeUsers(
 	})
 }
 
-// InitializeChannels initializes default channels and messages on startup
-func InitializeChannels(
+// initializeChannels initializes default channels and messages on startup
+func initializeChannels(
 	lc fx.Lifecycle,
 	userRepo mongodb.UserRepository,
 	channelRepo mongodb.ChannelRepository,

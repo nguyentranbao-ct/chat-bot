@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { setStoredToken, setStoredUser } from '../utils/auth';
 import { Layout } from '../components/Layout';
+import { useSocket } from '../contexts/SocketContext';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { connect } = useSocket();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +35,9 @@ const LoginPage: React.FC = () => {
       // Store auth data
       setStoredToken(response.token);
       setStoredUser(response.user);
+
+      // Trigger socket connection now that user is authenticated
+      connect();
 
       // Redirect to chat
       navigate('/chat');
