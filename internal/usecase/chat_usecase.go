@@ -15,8 +15,8 @@ import (
 )
 
 type ChatUseCase struct {
-	channelRepo       mongodb.ChannelRepository
-	channelMemberRepo mongodb.ChannelMemberRepository
+	roomRepo          mongodb.RoomRepository
+	roomMemberRepo    mongodb.RoomMemberRepository
 	chatMessageRepo   mongodb.ChatMessageRepository
 	messageEventRepo  mongodb.MessageEventRepository
 	unreadCountRepo   mongodb.UnreadCountRepository
@@ -28,16 +28,16 @@ type ChatUseCase struct {
 }
 
 type SocketBroadcaster interface {
-	BroadcastMessage(channelID string, message *models.ChatMessage)
+	BroadcastMessage(roomID string, message *models.ChatMessage)
 	BroadcastMessageSent(userID string, message *models.ChatMessage)
-	BroadcastTyping(channelID, userID string, isTyping bool)
+	BroadcastTyping(roomID, userID string, isTyping bool)
 	BroadcastMessageToUsers(userIDs []string, message *models.ChatMessage)
-	BroadcastTypingToUsers(userIDs []string, channelID, userID string, isTyping bool)
+	BroadcastTypingToUsers(userIDs []string, roomID, userID string, isTyping bool)
 }
 
 func NewChatUseCase(
-	channelRepo mongodb.ChannelRepository,
-	channelMemberRepo mongodb.ChannelMemberRepository,
+	roomRepo mongodb.RoomRepository,
+	roomMemberRepo mongodb.RoomMemberRepository,
 	chatMessageRepo mongodb.ChatMessageRepository,
 	messageEventRepo mongodb.MessageEventRepository,
 	unreadCountRepo mongodb.UnreadCountRepository,
@@ -48,8 +48,8 @@ func NewChatUseCase(
 	llmUsecaseV2 LLMUsecaseV2,
 ) *ChatUseCase {
 	return &ChatUseCase{
-		channelRepo:       channelRepo,
-		channelMemberRepo: channelMemberRepo,
+		roomRepo:          roomRepo,
+		roomMemberRepo:    roomMemberRepo,
 		chatMessageRepo:   chatMessageRepo,
 		messageEventRepo:  messageEventRepo,
 		unreadCountRepo:   unreadCountRepo,
@@ -61,28 +61,28 @@ func NewChatUseCase(
 	}
 }
 
-func (uc *ChatUseCase) GetUserChannels(ctx context.Context, userID primitive.ObjectID) ([]interface{}, error) {
-	results, err := uc.channelRepo.GetChannelsWithUnreadCount(ctx, userID)
+func (uc *ChatUseCase) GetUserRooms(ctx context.Context, userID primitive.ObjectID) ([]interface{}, error) {
+	results, err := uc.roomRepo.GetRoomsWithUnreadCount(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Convert []bson.M to []interface{}
-	channels := make([]interface{}, len(results))
+	rooms := make([]interface{}, len(results))
 	for i, result := range results {
-		channels[i] = result
+		rooms[i] = result
 	}
 
-	return channels, nil
+	return rooms, nil
 }
 
-func (uc *ChatUseCase) GetChannelMembers(ctx context.Context, channelID primitive.ObjectID) ([]*models.ChannelMember, error) {
-	return uc.channelMemberRepo.GetChannelMembers(ctx, channelID)
+func (uc *ChatUseCase) GetRoomMembers(ctx context.Context, roomID primitive.ObjectID) ([]*models.RoomMember, error) {
+	return uc.roomMemberRepo.GetRoomMembers(ctx, roomID)
 }
 
 // SendMessageParams contains parameters for sending a message
 type SendMessageParams struct {
-	ChannelID   primitive.ObjectID     `json:"channel_id"`
+	RoomID      primitive.ObjectID     `json:"room_id"`
 	SenderID    primitive.ObjectID     `json:"sender_id"`
 	Content     string                 `json:"content"`
 	Metadata    map[string]interface{} `json:"metadata,omitempty"`
@@ -90,15 +90,15 @@ type SendMessageParams struct {
 }
 
 func (uc *ChatUseCase) SendMessage(ctx context.Context, params SendMessageParams) (*models.ChatMessage, error) {
-	// Get channel info
-	channel, err := uc.channelRepo.GetByID(ctx, params.ChannelID)
+	// Get room info
+	room, err := uc.roomRepo.GetByID(ctx, params.RoomID)
 	if err != nil {
-		return nil, fmt.Errorf("channel not found: %w", err)
+		return nil, fmt.Errorf("room not found: %w", err)
 	}
 
 	// Create message in our database
 	message := &models.ChatMessage{
-		ChannelID: params.ChannelID,
+		RoomID:    params.RoomID,
 		SenderID:  params.SenderID,
 		Content:   params.Content,
 		CreatedAt: time.Now(),
@@ -113,44 +113,44 @@ func (uc *ChatUseCase) SendMessage(ctx context.Context, params SendMessageParams
 	}
 
 	// Post-process the sent message
-	go uc.postProcessSentMessage(ctx, message, channel, params)
+	go uc.postProcessSentMessage(ctx, message, room, params)
 
-	// Update channel last message time synchronously
-	if err := uc.channelRepo.UpdateLastMessage(ctx, params.ChannelID); err != nil {
-		log.Warnw(ctx, "Failed to update channel last message time", "error", err)
+	// Update room last message time synchronously
+	if err := uc.roomRepo.UpdateLastMessage(ctx, params.RoomID); err != nil {
+		log.Warnw(ctx, "Failed to update room last message time", "error", err)
 	}
 
 	return message, nil
 }
 
 // postProcessSentMessage handles all post-processing after a message is sent
-func (uc *ChatUseCase) postProcessSentMessage(ctx context.Context, message *models.ChatMessage, channel *models.Channel, params SendMessageParams) {
+func (uc *ChatUseCase) postProcessSentMessage(ctx context.Context, message *models.ChatMessage, room *models.Room, params SendMessageParams) {
 	ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
 	defer cancel()
 
 	// Increment unread count for other members
-	uc.incrementUnreadCountForOthers(ctx, params.ChannelID, params.SenderID)
+	uc.incrementUnreadCountForOthers(ctx, params.RoomID, params.SenderID)
 
 	// Create message event for real-time sync
 	uc.createMessageSentEvent(ctx, message, params)
 
 	// Send to external partner asynchronously, unless skipped
 	if !params.SkipPartner {
-		uc.sendToExternalPartner(ctx, message, channel, params)
+		uc.sendToExternalPartner(ctx, message, room, params)
 	}
 }
 
 // sendToExternalPartner sends the message to the external partner
-func (uc *ChatUseCase) sendToExternalPartner(ctx context.Context, message *models.ChatMessage, channel *models.Channel, params SendMessageParams) {
+func (uc *ChatUseCase) sendToExternalPartner(ctx context.Context, message *models.ChatMessage, room *models.Room, params SendMessageParams) {
 	timeoutCtx, cancel := util.NewTimeoutContext(ctx, 15*time.Second)
 	defer cancel()
 
 	// Get partner instance
-	partnerInstance, err := uc.partnerRegistry.GetPartnerByName(channel.Source.Name)
+	partnerInstance, err := uc.partnerRegistry.GetPartnerByName(room.Source.Name)
 	if err != nil {
 		log.Errorw(timeoutCtx, "Failed to get partner for message sending",
-			"partner_name", channel.Source.Name,
-			"channel_id", channel.Source.ChannelID,
+			"partner_name", room.Source.Name,
+			"room_id", room.Source.RoomID,
 			"error", err)
 		uc.chatMessageRepo.UpdateDeliveryStatus(timeoutCtx, message.ID, "failed")
 		return
@@ -168,23 +168,23 @@ func (uc *ChatUseCase) sendToExternalPartner(ctx context.Context, message *model
 
 	// Prepare partner send params
 	sendParams := partners.SendMessageParams{
-		ChannelID: channel.Source.ChannelID,
-		SenderID:  idAttr.Value,
-		Content:   params.Content,
-		Metadata:  params.Metadata,
+		RoomID:   room.Source.RoomID,
+		SenderID: idAttr.Value,
+		Content:  params.Content,
+		Metadata: params.Metadata,
 	}
 
 	// Send via partner
 	if err := partnerInstance.SendMessage(timeoutCtx, sendParams); err != nil {
 		log.Errorw(timeoutCtx, "Failed to send message via partner",
-			"partner_name", channel.Source.Name,
-			"channel_id", params.ChannelID,
+			"partner_name", room.Source.Name,
+			"room_id", params.RoomID,
 			"error", err)
 		uc.chatMessageRepo.UpdateDeliveryStatus(timeoutCtx, message.ID, "failed")
 	} else {
 		log.Debugw(timeoutCtx, "Message sent successfully via partner",
-			"partner_name", channel.Source.Name,
-			"channel_id", params.ChannelID)
+			"partner_name", room.Source.Name,
+			"room_id", params.RoomID)
 		uc.chatMessageRepo.UpdateDeliveryStatus(timeoutCtx, message.ID, "delivered")
 	}
 }
@@ -192,7 +192,7 @@ func (uc *ChatUseCase) sendToExternalPartner(ctx context.Context, message *model
 // createMessageSentEvent creates a real-time event for the sent message
 func (uc *ChatUseCase) createMessageSentEvent(ctx context.Context, message *models.ChatMessage, params SendMessageParams) {
 	eventParams := mongodb.CreateEventParams{
-		ChannelID: params.ChannelID,
+		RoomID:    params.RoomID,
 		EventType: "message_sent",
 		MessageID: &message.ID,
 		UserID:    params.SenderID,
@@ -206,16 +206,16 @@ func (uc *ChatUseCase) createMessageSentEvent(ctx context.Context, message *mode
 	}
 }
 
-func (uc *ChatUseCase) GetChannelMessages(ctx context.Context, channelID primitive.ObjectID, limit int, before *primitive.ObjectID) ([]*models.ChatMessage, error) {
-	return uc.chatMessageRepo.GetChannelMessages(ctx, channelID, limit, before)
+func (uc *ChatUseCase) GetRoomMessages(ctx context.Context, roomID primitive.ObjectID, limit int, before *primitive.ObjectID) ([]*models.ChatMessage, error) {
+	return uc.chatMessageRepo.GetRoomMessages(ctx, roomID, limit, before)
 }
 
-func (uc *ChatUseCase) GetChannelEvents(ctx context.Context, channelID primitive.ObjectID, sinceTime time.Time) ([]*models.MessageEvent, error) {
-	return uc.messageEventRepo.GetChannelEvents(ctx, channelID, sinceTime)
+func (uc *ChatUseCase) GetRoomEvents(ctx context.Context, roomID primitive.ObjectID, sinceTime time.Time) ([]*models.MessageEvent, error) {
+	return uc.messageEventRepo.GetRoomEvents(ctx, roomID, sinceTime)
 }
 
-func (uc *ChatUseCase) MarkAsRead(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error {
-	return uc.unreadCountRepo.MarkAsRead(ctx, channelID, userID, lastReadMessageID)
+func (uc *ChatUseCase) MarkAsRead(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error {
+	return uc.unreadCountRepo.MarkAsRead(ctx, roomID, userID, lastReadMessageID)
 }
 
 func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage models.KafkaMessageData) error {
@@ -234,15 +234,15 @@ func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage 
 		log.Warnw(ctx, "Failed to sync user, continuing without user info", "error", err, "sender_id", kafkaMessage.SenderID)
 	}
 
-	// Find or create channel
-	channel, err := uc.findOrCreateChannel(ctx, kafkaMessage.ChannelID, partnerType)
+	// Find or create room
+	room, err := uc.findOrCreateRoom(ctx, kafkaMessage.ChannelID, partnerType)
 	if err != nil {
-		return fmt.Errorf("failed to find/create channel: %w", err)
+		return fmt.Errorf("failed to find/create room: %w", err)
 	}
 
 	// Create message in our database
 	message := &models.ChatMessage{
-		ChannelID: channel.ID,
+		RoomID:    room.ID,
 		SenderID:  user.ID,
 		Content:   kafkaMessage.Message,
 		CreatedAt: time.Unix(kafkaMessage.CreatedAt, 0),
@@ -258,36 +258,36 @@ func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage 
 	}
 
 	// Post-process the incoming message
-	go uc.postProcessIncomingMessage(ctx, message, channel, partnerType)
+	go uc.postProcessIncomingMessage(ctx, message, room, partnerType)
 
-	// Update channel last message time synchronously
-	if err := uc.channelRepo.UpdateLastMessage(ctx, channel.ID); err != nil {
-		log.Warnw(ctx, "Failed to update channel last message time", "error", err)
+	// Update room last message time synchronously
+	if err := uc.roomRepo.UpdateLastMessage(ctx, room.ID); err != nil {
+		log.Warnw(ctx, "Failed to update room last message time", "error", err)
 	}
 
 	return nil
 }
 
 // postProcessIncomingMessage handles all post-processing after an incoming message is received
-func (uc *ChatUseCase) postProcessIncomingMessage(ctx context.Context, message *models.ChatMessage, channel *models.Channel, partnerType partners.PartnerType) {
+func (uc *ChatUseCase) postProcessIncomingMessage(ctx context.Context, message *models.ChatMessage, room *models.Room, partnerType partners.PartnerType) {
 	ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
 	defer cancel()
 	// Increment unread count for all members except sender
-	uc.incrementUnreadCountForOthers(ctx, channel.ID, message.SenderID)
+	uc.incrementUnreadCountForOthers(ctx, room.ID, message.SenderID)
 
 	// Create message event for real-time sync
-	uc.createMessageReceivedEvent(ctx, message, channel)
+	uc.createMessageReceivedEvent(ctx, message, room)
 
 	// Broadcast to socket connections
-	uc.broadcastIncomingMessage(ctx, message, channel.ID)
+	uc.broadcastIncomingMessage(ctx, message, room.ID)
 
-	uc.llmUsecaseV2.TriggerLLM(ctx, message, channel)
+	uc.llmUsecaseV2.TriggerLLM(ctx, message, room)
 }
 
 // createMessageReceivedEvent creates a real-time event for the received message
-func (uc *ChatUseCase) createMessageReceivedEvent(ctx context.Context, message *models.ChatMessage, channel *models.Channel) {
+func (uc *ChatUseCase) createMessageReceivedEvent(ctx context.Context, message *models.ChatMessage, room *models.Room) {
 	eventParams := mongodb.CreateEventParams{
-		ChannelID: channel.ID,
+		RoomID:    room.ID,
 		EventType: "message_received",
 		MessageID: &message.ID,
 		UserID:    message.SenderID,
@@ -302,15 +302,15 @@ func (uc *ChatUseCase) createMessageReceivedEvent(ctx context.Context, message *
 	}
 }
 
-// broadcastIncomingMessage broadcasts the incoming message to all channel members via socket
-func (uc *ChatUseCase) broadcastIncomingMessage(ctx context.Context, message *models.ChatMessage, channelID primitive.ObjectID) {
+// broadcastIncomingMessage broadcasts the incoming message to all room members via socket
+func (uc *ChatUseCase) broadcastIncomingMessage(ctx context.Context, message *models.ChatMessage, roomID primitive.ObjectID) {
 	if uc.socketHandler == nil {
 		return
 	}
 
-	members, err := uc.channelMemberRepo.GetChannelMembers(ctx, channelID)
+	members, err := uc.roomMemberRepo.GetRoomMembers(ctx, roomID)
 	if err != nil {
-		log.Errorw(ctx, "Failed to get channel members for socket broadcast", "error", err)
+		log.Errorw(ctx, "Failed to get room members for socket broadcast", "error", err)
 		return
 	}
 
@@ -322,53 +322,53 @@ func (uc *ChatUseCase) broadcastIncomingMessage(ctx context.Context, message *mo
 	uc.socketHandler.BroadcastMessageToUsers(userIDs, message)
 }
 
-func (uc *ChatUseCase) findOrCreateChannel(ctx context.Context, channelID string, partner partners.PartnerType) (*models.Channel,
+func (uc *ChatUseCase) findOrCreateRoom(ctx context.Context, roomID string, partner partners.PartnerType) (*models.Room,
 	error,
 ) {
-	// Try to find existing channel using partner info
-	channel, err := uc.channelRepo.GetByPartnerChannelID(ctx, string(partner), channelID)
+	// Try to find existing room using partner info
+	room, err := uc.roomRepo.GetByPartnerRoomID(ctx, string(partner), roomID)
 	if err == nil {
-		return channel, nil
+		return room, nil
 	}
 
-	// Channel doesn't exist, create it using the appropriate partner
+	// Room doesn't exist, create it using the appropriate partner
 	partnerInstance, err := uc.partnerRegistry.GetPartner(partner)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get partner %s: %w", partner, err)
 	}
 
-	// Get channel info from partner
-	partnerChannelInfo, err := partnerInstance.GetChannelInfo(ctx, channelID)
+	// Get room info from partner
+	partnerRoomInfo, err := partnerInstance.GetRoomInfo(ctx, roomID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get channel info from partner %s: %w", partner, err)
+		return nil, fmt.Errorf("failed to get room info from partner %s: %w", partner, err)
 	}
 
-	// Create metadata from partner channel info
+	// Create metadata from partner room info
 	metadata := make(map[string]any)
-	for key, value := range partnerChannelInfo.Metadata {
+	for key, value := range partnerRoomInfo.Metadata {
 		metadata[key] = value
 	}
 	ts := time.Now()
 
-	channel = &models.Channel{
-		Source: models.ChannelPartner{
-			ChannelID: channelID,
-			Name:      string(partner),
+	room = &models.Room{
+		Source: models.RoomPartner{
+			RoomID: roomID,
+			Name:   string(partner),
 		},
-		Name:          partnerChannelInfo.Name,
-		Context:       partnerChannelInfo.Context,
+		Name:          partnerRoomInfo.Name,
+		Context:       partnerRoomInfo.Context,
 		LastMessageAt: &ts,
 		Metadata:      metadata,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
 	}
 
-	if err := uc.channelRepo.Create(ctx, channel); err != nil {
-		return nil, fmt.Errorf("failed to create channel: %w", err)
+	if err := uc.roomRepo.Create(ctx, room); err != nil {
+		return nil, fmt.Errorf("failed to create room: %w", err)
 	}
 
-	// Add channel members - map partner user IDs to internal user IDs
-	for _, participant := range partnerChannelInfo.Participants {
+	// Add room members - map partner user IDs to internal user IDs
+	for _, participant := range partnerRoomInfo.Participants {
 		// Find or sync the user to get internal user ID
 		internalUser, err := uc.findOrSyncUser(ctx, participant.UserID, partner)
 		if err != nil {
@@ -376,31 +376,31 @@ func (uc *ChatUseCase) findOrCreateChannel(ctx context.Context, channelID string
 			continue
 		}
 
-		member := &models.ChannelMember{
-			ChannelID: channel.ID,
-			UserID:    internalUser.ID, // Use internal user ID
-			Role:      participant.Role,
-			JoinedAt:  time.Now(),
+		member := &models.RoomMember{
+			RoomID:   room.ID,
+			UserID:   internalUser.ID, // Use internal user ID
+			Role:     participant.Role,
+			JoinedAt: time.Now(),
 		}
 
-		if err := uc.channelMemberRepo.Create(ctx, member); err != nil {
-			log.Warnw(ctx, "Failed to create channel member", "error", err, "user_id", internalUser.ID.Hex())
+		if err := uc.roomMemberRepo.Create(ctx, member); err != nil {
+			log.Warnw(ctx, "Failed to create room member", "error", err, "user_id", internalUser.ID.Hex())
 		}
 	}
 
-	return channel, nil
+	return room, nil
 }
 
-func (uc *ChatUseCase) incrementUnreadCountForOthers(ctx context.Context, channelID primitive.ObjectID, senderID primitive.ObjectID) {
-	members, err := uc.channelMemberRepo.GetChannelMembers(ctx, channelID)
+func (uc *ChatUseCase) incrementUnreadCountForOthers(ctx context.Context, roomID primitive.ObjectID, senderID primitive.ObjectID) {
+	members, err := uc.roomMemberRepo.GetRoomMembers(ctx, roomID)
 	if err != nil {
-		fmt.Printf("Failed to get channel members for unread count: %v\n", err)
+		fmt.Printf("Failed to get room members for unread count: %v\n", err)
 		return
 	}
 
 	for _, member := range members {
 		if member.UserID != senderID {
-			if err := uc.unreadCountRepo.IncrementUnreadCount(ctx, channelID, member.UserID); err != nil {
+			if err := uc.unreadCountRepo.IncrementUnreadCount(ctx, roomID, member.UserID); err != nil {
 				fmt.Printf("Failed to increment unread count for user %s: %v\n", member.UserID, err)
 			}
 		}

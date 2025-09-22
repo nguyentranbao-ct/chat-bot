@@ -15,7 +15,7 @@ import (
 type PurchaseIntentRepository interface {
 	Create(ctx context.Context, intent *models.PurchaseIntent) error
 	GetBySessionID(ctx context.Context, sessionID primitive.ObjectID) ([]*models.PurchaseIntent, error)
-	GetByChannelID(ctx context.Context, channelID string) ([]*models.PurchaseIntent, error)
+	GetByRoomID(ctx context.Context, roomID string) ([]*models.PurchaseIntent, error)
 }
 
 type purchaseIntentRepo struct {
@@ -65,13 +65,13 @@ func (r *purchaseIntentRepo) GetBySessionID(ctx context.Context, sessionID primi
 	return intents, nil
 }
 
-func (r *purchaseIntentRepo) GetByChannelID(ctx context.Context, channelID string) ([]*models.PurchaseIntent, error) {
-	filter := bson.M{"channel_id": channelID}
+func (r *purchaseIntentRepo) GetByRoomID(ctx context.Context, roomID string) ([]*models.PurchaseIntent, error) {
+	filter := bson.M{"room_id": roomID}
 	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}})
 
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get purchase intents by channel: %w", err)
+		return nil, fmt.Errorf("failed to get purchase intents by room: %w", err)
 	}
 	defer cursor.Close(ctx)
 

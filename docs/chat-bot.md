@@ -15,7 +15,7 @@ POST /api/v1/messages
 
 ```json
 {
-  "channel_id": "string",
+  "room_id": "string",
   "created_at": 1758015379886,
   "sender_id": "string",
   "message": "string",
@@ -42,7 +42,7 @@ curl --location 'http://chat-bot.chat/api/v1/messages' \
 --header 'Service: chat-bot' \
 --header 'Content-Type: application/json' \
 --data '{
-  "channel_id": "string",
+  "room_id": "string",
   "created_at": 1758015379886,
   "sender_id": "string",
   "message": "string",

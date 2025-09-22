@@ -21,8 +21,6 @@ github.com/carousell/chat-api v0.0.0-20250918074315-52169473979d h1:fjmt/zwnVKm7
 github.com/carousell/chat-api v0.0.0-20250918074315-52169473979d/go.mod h1:k9vNFmRmjyRv18/Okw2UEdMNQhSmaQUdsaRe8d3Ayqg=
 github.com/carousell/ct-go/pkg/httpclient v0.12.0 h1:NbVa+n1SNFJjQ0sgdbhDIgZmmYA8IQpMJgHAEZ+wJAo=
 github.com/carousell/ct-go/pkg/httpclient v0.12.0/go.mod h1:jmgKX0MGZmxpgSngpvzmJ9+OxymnWHvRy7JBaTKsQ5I=
-github.com/carousell/ct-go/pkg/httputils v0.3.0 h1:jwZ3teytIzpGceRogpYrojW+lrf1LZm1P8DgqeftTpc=
-github.com/carousell/ct-go/pkg/httputils v0.3.0/go.mod h1:IppACHKxgxs/bOScvsBy1peswvxLs+1E2nVHbw8ZCqU=
 github.com/carousell/ct-go/pkg/json v0.3.3 h1:/FWRASpJLYWJiGHJR6BuE3b3jGpwdq0X/j38Jh5iRv0=
 github.com/carousell/ct-go/pkg/json v0.3.3/go.mod h1:6BUzpqE7XkJfP64e3Hne3nLsj+AW5OPcmSWnTxIZ184=
 github.com/carousell/ct-go/pkg/logger v0.9.8 h1:T98no4fwnhUJHo/12y815/dwMUcEponqIf8lGz8zflE=

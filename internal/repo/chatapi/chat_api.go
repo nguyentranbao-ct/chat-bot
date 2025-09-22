@@ -13,14 +13,14 @@ import (
 )
 
 type MessageHistoryRequest struct {
-	UserID    primitive.ObjectID
-	ChannelID primitive.ObjectID
-	Limit     int
-	BeforeTs  *int64
+	UserID   primitive.ObjectID
+	RoomID   primitive.ObjectID
+	Limit    int
+	BeforeTs *int64
 }
 
 type Client interface {
-	GetChannelInfo(ctx context.Context, channelID string) (*models.ChannelInfo, error)
+	GetRoomInfo(ctx context.Context, roomID string) (*models.RoomInfo, error)
 	SendMessage(ctx context.Context, message *models.OutgoingMessage) error
 }
 
@@ -49,48 +49,48 @@ func NewChatAPIClient(conf *config.Config) Client {
 	}
 }
 
-func (c *chatAPIClient) GetChannelInfo(ctx context.Context, channelID string) (*models.ChannelInfo, error) {
+func (c *chatAPIClient) GetRoomInfo(ctx context.Context, roomID string) (*models.RoomInfo, error) {
 	// Create timeout context
 	timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	request := types.GetPlainUserChannelsRequest{
 		ProjectID: c.projectID,
-		ChannelID: channelID,
+		ChannelID: roomID,
 	}
 
 	resp, err := c.client.GetPlainUserChannels(timeoutCtx, request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get plain user channels: %w", err)
+		return nil, fmt.Errorf("failed to get plain user rooms: %w", err)
 	}
 
 	if len(resp.Data) == 0 {
-		return nil, fmt.Errorf("channel not found")
+		return nil, fmt.Errorf("room not found")
 	}
 
-	// Use the first user channel data to get channel info
-	firstChannel := resp.Data[0]
+	// Use the first user room data to get room info
+	firstRoom := resp.Data[0]
 
 	// Convert chat-api response to our internal model
-	channelInfo := &models.ChannelInfo{
-		ID:           firstChannel.ChannelID,
-		Name:         firstChannel.Name,
-		ItemName:     firstChannel.ItemName,
-		ItemPrice:    firstChannel.ItemPrice,
-		Context:      getMetadataString(firstChannel.Metadata, "context"),
+	roomInfo := &models.RoomInfo{
+		ID:           firstRoom.ChannelID,
+		Name:         firstRoom.Name,
+		ItemName:     firstRoom.ItemName,
+		ItemPrice:    firstRoom.ItemPrice,
+		Context:      getMetadataString(firstRoom.Metadata, "context"),
 		Participants: make([]models.Participant, 0, len(resp.Data)),
 	}
 
-	// Convert all user channels to participants
-	for _, userChannel := range resp.Data {
+	// Convert all user rooms to participants
+	for _, userRoom := range resp.Data {
 		participant := models.Participant{
-			UserID: userChannel.UserID,
-			Role:   userChannel.Role,
+			UserID: userRoom.UserID,
+			Role:   userRoom.Role,
 		}
-		channelInfo.Participants = append(channelInfo.Participants, participant)
+		roomInfo.Participants = append(roomInfo.Participants, participant)
 	}
 
-	return channelInfo, nil
+	return roomInfo, nil
 }
 
 func (c *chatAPIClient) SendMessage(ctx context.Context, message *models.OutgoingMessage) error {
@@ -100,7 +100,7 @@ func (c *chatAPIClient) SendMessage(ctx context.Context, message *models.Outgoin
 
 	request := types.InternalSendMessageRequest{
 		ProjectID: c.projectID,
-		ChannelID: message.ChannelID,
+		ChannelID: message.RoomID,
 		SenderID:  message.SenderID, // This should be the bot/system sender ID
 		Message:   message.Message,
 		Type:      "text",

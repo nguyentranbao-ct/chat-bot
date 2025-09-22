@@ -17,14 +17,14 @@ type ChatMessageRepository interface {
 	Create(ctx context.Context, message *models.ChatMessage) error
 	Upsert(ctx context.Context, message *models.ChatMessage) error
 	GetByID(ctx context.Context, id primitive.ObjectID) (*models.ChatMessage, error)
-	GetChannelMessages(ctx context.Context, channelID primitive.ObjectID, limit int, before *primitive.ObjectID) ([]*models.ChatMessage, error)
+	GetRoomMessages(ctx context.Context, roomID primitive.ObjectID, limit int, before *primitive.ObjectID) ([]*models.ChatMessage, error)
 	GetByExternalMessageID(ctx context.Context, externalMessageID string) (*models.ChatMessage, error)
-	GetLatestMessage(ctx context.Context, channelID primitive.ObjectID) (*models.ChatMessage, error)
-	GetUnreadMessages(ctx context.Context, channelID primitive.ObjectID, userID string, lastReadMessageID *primitive.ObjectID) ([]*models.ChatMessage, error)
+	GetLatestMessage(ctx context.Context, roomID primitive.ObjectID) (*models.ChatMessage, error)
+	GetUnreadMessages(ctx context.Context, roomID primitive.ObjectID, userID string, lastReadMessageID *primitive.ObjectID) ([]*models.ChatMessage, error)
 	UpdateMessage(ctx context.Context, messageID primitive.ObjectID, content string) error
 	SoftDeleteMessage(ctx context.Context, messageID primitive.ObjectID) error
 	UpdateDeliveryStatus(ctx context.Context, messageID primitive.ObjectID, status string) error
-	GetMessagesByTimeRange(ctx context.Context, channelID primitive.ObjectID, startTime, endTime time.Time) ([]*models.ChatMessage, error)
+	GetMessagesByTimeRange(ctx context.Context, roomID primitive.ObjectID, startTime, endTime time.Time) ([]*models.ChatMessage, error)
 }
 
 type chatMessageRepo struct {
@@ -70,7 +70,7 @@ func (r *chatMessageRepo) Upsert(ctx context.Context, message *models.ChatMessag
 
 	update := bson.M{
 		"$set": bson.M{
-			"channel_id": message.ChannelID,
+			"room_id":    message.RoomID,
 			"sender_id":  message.SenderID,
 			"content":    message.Content,
 			"updated_at": now,
@@ -113,9 +113,9 @@ func (r *chatMessageRepo) GetByID(ctx context.Context, id primitive.ObjectID) (*
 	return &message, nil
 }
 
-func (r *chatMessageRepo) GetChannelMessages(ctx context.Context, channelID primitive.ObjectID, limit int, before *primitive.ObjectID) ([]*models.ChatMessage, error) {
+func (r *chatMessageRepo) GetRoomMessages(ctx context.Context, roomID primitive.ObjectID, limit int, before *primitive.ObjectID) ([]*models.ChatMessage, error) {
 	filter := bson.M{
-		"channel_id": channelID,
+		"room_id": roomID,
 	}
 
 	if before != nil {
@@ -128,7 +128,7 @@ func (r *chatMessageRepo) GetChannelMessages(ctx context.Context, channelID prim
 
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get channel messages: %w", err)
+		return nil, fmt.Errorf("failed to get room messages: %w", err)
 	}
 	defer cursor.Close(ctx)
 
@@ -160,9 +160,9 @@ func (r *chatMessageRepo) GetByExternalMessageID(ctx context.Context, externalMe
 	return &message, nil
 }
 
-func (r *chatMessageRepo) GetLatestMessage(ctx context.Context, channelID primitive.ObjectID) (*models.ChatMessage, error) {
+func (r *chatMessageRepo) GetLatestMessage(ctx context.Context, roomID primitive.ObjectID) (*models.ChatMessage, error) {
 	filter := bson.M{
-		"channel_id": channelID,
+		"room_id": roomID,
 	}
 
 	opts := options.FindOne().SetSort(bson.D{{Key: "created_at", Value: -1}})
@@ -177,10 +177,10 @@ func (r *chatMessageRepo) GetLatestMessage(ctx context.Context, channelID primit
 	return &message, nil
 }
 
-func (r *chatMessageRepo) GetUnreadMessages(ctx context.Context, channelID primitive.ObjectID, userID string, lastReadMessageID *primitive.ObjectID) ([]*models.ChatMessage, error) {
+func (r *chatMessageRepo) GetUnreadMessages(ctx context.Context, roomID primitive.ObjectID, userID string, lastReadMessageID *primitive.ObjectID) ([]*models.ChatMessage, error) {
 	filter := bson.M{
-		"channel_id": channelID,
-		"sender_id":  bson.M{"$ne": userID}, // exclude user's own messages
+		"room_id":   roomID,
+		"sender_id": bson.M{"$ne": userID}, // exclude user's own messages
 	}
 
 	if lastReadMessageID != nil {
@@ -249,9 +249,9 @@ func (r *chatMessageRepo) UpdateDeliveryStatus(ctx context.Context, messageID pr
 	return err
 }
 
-func (r *chatMessageRepo) GetMessagesByTimeRange(ctx context.Context, channelID primitive.ObjectID, startTime, endTime time.Time) ([]*models.ChatMessage, error) {
+func (r *chatMessageRepo) GetMessagesByTimeRange(ctx context.Context, roomID primitive.ObjectID, startTime, endTime time.Time) ([]*models.ChatMessage, error) {
 	filter := bson.M{
-		"channel_id": channelID,
+		"room_id": roomID,
 		"created_at": bson.M{
 			"$gte": startTime,
 			"$lte": endTime,
@@ -284,7 +284,7 @@ func (r *chatMessageRepo) GetMessagesByTimeRange(ctx context.Context, channelID 
 type MessageEventRepository interface {
 	Create(ctx context.Context, event *models.MessageEvent) error
 	CreateEvent(ctx context.Context, params CreateEventParams) error
-	GetChannelEvents(ctx context.Context, channelID primitive.ObjectID, sinceTime time.Time) ([]*models.MessageEvent, error)
+	GetRoomEvents(ctx context.Context, roomID primitive.ObjectID, sinceTime time.Time) ([]*models.MessageEvent, error)
 	CleanupExpiredEvents(ctx context.Context) error
 }
 
@@ -311,7 +311,7 @@ func (r *messageEventRepo) Create(ctx context.Context, event *models.MessageEven
 
 // CreateEventParams contains parameters for creating a message event
 type CreateEventParams struct {
-	ChannelID primitive.ObjectID     `json:"channel_id"`
+	RoomID    primitive.ObjectID     `json:"room_id"`
 	EventType string                 `json:"event_type"`
 	MessageID *primitive.ObjectID    `json:"message_id,omitempty"`
 	UserID    primitive.ObjectID     `json:"user_id"`
@@ -320,7 +320,7 @@ type CreateEventParams struct {
 
 func (r *messageEventRepo) CreateEvent(ctx context.Context, params CreateEventParams) error {
 	event := &models.MessageEvent{
-		ChannelID: params.ChannelID,
+		RoomID:    params.RoomID,
 		EventType: params.EventType,
 		MessageID: params.MessageID,
 		UserID:    params.UserID,
@@ -332,9 +332,9 @@ func (r *messageEventRepo) CreateEvent(ctx context.Context, params CreateEventPa
 	return r.Create(ctx, event)
 }
 
-func (r *messageEventRepo) GetChannelEvents(ctx context.Context, channelID primitive.ObjectID, sinceTime time.Time) ([]*models.MessageEvent, error) {
+func (r *messageEventRepo) GetRoomEvents(ctx context.Context, roomID primitive.ObjectID, sinceTime time.Time) ([]*models.MessageEvent, error) {
 	filter := bson.M{
-		"channel_id": channelID,
+		"room_id":    roomID,
 		"created_at": bson.M{"$gt": sinceTime},
 		"expires_at": bson.M{"$gt": time.Now()},
 	}
@@ -342,7 +342,7 @@ func (r *messageEventRepo) GetChannelEvents(ctx context.Context, channelID primi
 	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: 1}})
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get channel events: %w", err)
+		return nil, fmt.Errorf("failed to get room events: %w", err)
 	}
 	defer cursor.Close(ctx)
 

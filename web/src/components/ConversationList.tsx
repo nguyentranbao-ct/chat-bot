@@ -1,16 +1,16 @@
 import React from 'react';
-import { Channel } from '../types';
+import { Room } from '../types';
 
 interface ConversationListProps {
-  channels: Channel[];
-  selectedChannelId?: string;
-  onChannelSelect: (channel: Channel) => void;
+  rooms: Room[];
+  selectedRoomId?: string;
+  onRoomSelect: (room: Room) => void;
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
-  channels,
-  selectedChannelId,
-  onChannelSelect,
+  rooms,
+  selectedRoomId,
+  onRoomSelect,
 }) => {
   const formatLastMessageTime = (timestamp?: string) => {
     if (!timestamp) return '';
@@ -67,23 +67,23 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
       {/* Conversation List */}
       <div className="flex-1 overflow-y-auto">
-        {channels.length === 0 ? (
+        {rooms.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
             No conversations yet
           </div>
         ) : (
-          channels.map((channel) => (
+          rooms.map((room) => (
             <div
-              key={channel.id}
-              className={`conversation-list-item ${selectedChannelId === channel.id ? 'active' : ''
+              key={room.id}
+              className={`conversation-list-item ${selectedRoomId === room.id ? 'active' : ''
                 }`}
-              onClick={() => onChannelSelect(channel)}
+              onClick={() => onRoomSelect(room)}
             >
               <div className="flex items-start space-x-3">
                 {/* Avatar */}
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <span className="text-blue-600 font-medium text-sm">
-                    {channel.name?.substring(0, 2).toUpperCase() || 'CH'}
+                    {room.name?.substring(0, 2).toUpperCase() || 'CH'}
                   </span>
                 </div>
 
@@ -91,24 +91,24 @@ const ConversationList: React.FC<ConversationListProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium text-gray-900 truncate">
-                      {channel.name || 'Unnamed Channel'}
+                      {room.name || 'Unnamed Room'}
                     </h3>
                     <span className="text-xs text-gray-500">
-                      {formatLastMessageTime(channel.last_message_at)}
+                      {formatLastMessageTime(room.last_message_at)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between mt-1">
-                    {/* {channel.last_message_at} */}
+                    {/* {room.last_message_at} */}
 
                     <div className="text-sm text-gray-500 truncate">
-                      <span>{channel.context}</span>
+                      <span>{room.context}</span>
                     </div>
 
 
-                    {channel?.unread_count as any > 0 && (
+                    {room?.unread_count as any > 0 && (
                       <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
-                        {channel.unread_count}
+                        {room.unread_count}
                       </span>
                     )}
                   </div>

@@ -89,7 +89,7 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 	// Create purchase intent
 	intent := &models.PurchaseIntent{
 		SessionID:  session.GetSessionID(),
-		ChannelID:  session.GetChannelID(),
+		RoomID:     session.GetRoomID(),
 		UserID:     session.GetBuyerID(),
 		ItemName:   purchaseIntentArgs.ItemName,
 		ItemPrice:  purchaseIntentArgs.ItemPrice,
@@ -106,7 +106,7 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 		if err := t.sendPurchaseMessage(session, purchaseIntentArgs); err != nil {
 			log.Errorf(ctx, "Failed to send message after PurchaseIntent: %v", err)
 		} else {
-			log.Infof(ctx, "Message sent to channel %s after PurchaseIntent", session.GetChannelID())
+			log.Infof(ctx, "Message sent to room %s after PurchaseIntent", session.GetRoomID())
 		}
 	}
 
@@ -148,13 +148,13 @@ func (t *tool) parseArgs(args interface{}, target interface{}) error {
 	return nil
 }
 
-// sendPurchaseMessage sends a message to the chat channel
+// sendPurchaseMessage sends a message to the chat room
 func (t *tool) sendPurchaseMessage(session toolsmanager.SessionContext, args PurchaseIntentArgs) error {
 	ctx, cancel := util.NewTimeoutContext(session.Context(), 10*time.Second)
 	defer cancel()
 
 	req := internal_api.SendMessageRequest{
-		ChannelID:   session.GetChannelID().Hex(),
+		RoomID:      session.GetRoomID().Hex(),
 		SenderID:    session.GetMerchantID().Hex(),
 		SkipPartner: true,
 		Content:     fmt.Sprintf(`[PURCHASE_INTENT %d%%] %s`, args.Percentage, args.Message),
@@ -167,7 +167,7 @@ func (t *tool) sendPurchaseMessage(session toolsmanager.SessionContext, args Pur
 func (t *tool) logActivity(ctx context.Context, args PurchaseIntentArgs, session toolsmanager.SessionContext) error {
 	activity := &models.ChatActivity{
 		SessionID: session.GetSessionID(),
-		ChannelID: session.GetChannelID(),
+		RoomID:    session.GetRoomID(),
 		Action:    models.ActivityPurchaseIntent,
 		Data:      args,
 	}

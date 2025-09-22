@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement a Go-based chat-bot service that acts as an AI-powered seller in product chat channels, integrating with chat-api and using Firebase Genkit for Go for conversational AI.
+Implement a Go-based chat-bot service that acts as an AI-powered seller in product chat rooms, integrating with chat-api and using Firebase Genkit for Go for conversational AI.
 
 ## Phase 1: Project Foundation
 
@@ -44,7 +44,7 @@ Implement a Go-based chat-bot service that acts as an AI-powered seller in produ
    - Header validation (`x-project-uuid`, `Service`)
 
 6. **External API client**
-   - Chat-API client for message and channel operations
+   - Chat-API client for message and room operations
    - HTTP client with retry logic and timeouts
    - Request/response models matching documented schemas
 
@@ -67,13 +67,13 @@ Implement a Go-based chat-bot service that acts as an AI-powered seller in produ
 9. **Message processing usecase**
 
    - Validate incoming requests
-   - Gather channel info and message history
+   - Gather room info and message history
    - Build dynamic prompts using Go templates
    - Execute AI flows with tool integration
 
 10. **Prompt template system**
     - Go template engine for dynamic prompts
-    - Template context building from channel data
+    - Template context building from room data
     - Mode-specific prompt customization
 
 ## Phase 6: Testing & Quality
@@ -118,7 +118,7 @@ Implement a Go-based chat-bot service that acts as an AI-powered seller in produ
 
 - API accepts chat messages and triggers AI responses
 - Tools execute successfully (send replies, log purchases)
-- Dynamic prompts render with channel context
+- Dynamic prompts render with room context
 - Comprehensive test coverage (>80%)
 - Performance meets requirements (sub-second response times)
 - Error handling provides meaningful feedback

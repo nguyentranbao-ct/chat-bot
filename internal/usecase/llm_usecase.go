@@ -49,13 +49,13 @@ type PromptContext struct {
 	MerchantID primitive.ObjectID
 	BuyerID    primitive.ObjectID
 
-	Channel        *models.Channel
+	Room           *models.Room
 	Message        string
 	RecentMessages *models.MessageHistory
 }
 
 type PromptData struct {
-	Channel *models.Channel
+	Room    *models.Room
 	Message string
 }
 
@@ -81,7 +81,7 @@ func (l *llmUsecase) ProcessMessage(ctx context.Context, chatMode *models.ChatMo
 
 	// PHASE 3: Build prompt - only after validation passes
 	prompt, err := l.buildPrompt(chatMode.PromptTemplate, &PromptData{
-		Channel: data.Channel,
+		Room:    data.Room,
 		Message: data.Message,
 	})
 	if err != nil {
@@ -162,7 +162,7 @@ func (l *llmUsecase) createSessionContext(ctx context.Context, data *PromptConte
 	session := toolsmanager.NewSessionContext(ctx, toolsmanager.SessionContextConfig{
 		Genkit:      gk,
 		SessionID:   data.SessionID,
-		ChannelID:   data.Channel.ID,
+		RoomID:      data.Room.ID,
 		SessionRepo: l.sessionRepo,
 		BuyerID:     data.BuyerID,
 		MerchantID:  data.MerchantID,

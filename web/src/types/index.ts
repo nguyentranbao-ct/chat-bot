@@ -29,9 +29,9 @@ export interface ProfileUpdateRequest {
   chat_mode?: string;
 }
 
-export interface Channel {
+export interface Room {
   id: string;
-  external_channel_id: string;
+  external_room_id: string;
   name: string;
   item_name?: string;
   item_price?: string;
@@ -44,9 +44,9 @@ export interface Channel {
   unread_count?: number;
 }
 
-export interface ChannelMember {
+export interface RoomMember {
   id: string;
-  channel_id: string;
+  room_id: string;
   user_id: string;
   role: string;
   joined_at: string;
@@ -62,8 +62,8 @@ export interface MessageBlock {
 
 export interface ChatMessage {
   id: string;
-  channel_id: string;
-  external_channel_id: string;
+  room_id: string;
+  external_room_id: string;
   sender_id: string;
   message_type: string;
   content: string;
@@ -91,7 +91,7 @@ export interface SendMessageRequest {
 
 export interface MessageEvent {
   id: string;
-  channel_id: string;
+  room_id: string;
   event_type: string;
   message_id?: string;
   user_id: string;
@@ -101,7 +101,7 @@ export interface MessageEvent {
 }
 
 export interface TypingIndicator {
-  channel_id: string;
+  room_id: string;
   user_id: string;
   is_typing: boolean;
 }
@@ -111,5 +111,5 @@ export interface SocketEvents {
   message_received: ChatMessage;
   user_typing_start: TypingIndicator;
   user_typing_stop: TypingIndicator;
-  channel_updated: Channel;
+  room_updated: Room;
 }

@@ -21,16 +21,16 @@ func NewBroadcaster(client *Client) *Broadcaster {
 	}
 }
 
-// BroadcastMessage broadcasts a new message to all channel members
-func (b *Broadcaster) BroadcastMessage(channelID string, message *models.ChatMessage) {
+// BroadcastMessage broadcasts a new message to all room members
+func (b *Broadcaster) BroadcastMessage(roomID string, message *models.ChatMessage) {
 	ctx := context.Background()
 	args := BroadcastMessageArgs{
-		ChannelID: channelID,
-		Message:   message,
+		RoomID:  roomID,
+		Message: message,
 	}
 	if err := b.client.BroadcastMessage(ctx, args); err != nil {
 		// Log error but don't fail the operation
-		fmt.Printf("Failed to broadcast message to channel %s: %v\n", channelID, err)
+		fmt.Printf("Failed to broadcast message to room %s: %v\n", roomID, err)
 	}
 }
 
@@ -47,17 +47,17 @@ func (b *Broadcaster) BroadcastMessageSent(userID string, message *models.ChatMe
 	}
 }
 
-// BroadcastTyping broadcasts typing indicator to channel members
-func (b *Broadcaster) BroadcastTyping(channelID, userID string, isTyping bool) {
+// BroadcastTyping broadcasts typing indicator to room members
+func (b *Broadcaster) BroadcastTyping(roomID, userID string, isTyping bool) {
 	ctx := context.Background()
 	args := BroadcastTypingArgs{
-		ChannelID: channelID,
-		UserID:    userID,
-		IsTyping:  isTyping,
+		RoomID:   roomID,
+		UserID:   userID,
+		IsTyping: isTyping,
 	}
 	if err := b.client.BroadcastTyping(ctx, args); err != nil {
 		// Log error but don't fail the operation
-		fmt.Printf("Failed to broadcast typing status to channel %s: %v\n", channelID, err)
+		fmt.Printf("Failed to broadcast typing status to room %s: %v\n", roomID, err)
 	}
 }
 
@@ -75,11 +75,11 @@ func (b *Broadcaster) BroadcastMessageToUsers(userIDs []string, message *models.
 }
 
 // BroadcastTypingToUsers broadcasts typing indicator to specific users
-func (b *Broadcaster) BroadcastTypingToUsers(userIDs []string, channelID, userID string, isTyping bool) {
+func (b *Broadcaster) BroadcastTypingToUsers(userIDs []string, roomID, userID string, isTyping bool) {
 	ctx := context.Background()
 	args := BroadcastTypingToUsersArgs{
 		UserIDs:      userIDs,
-		ChannelID:    channelID,
+		RoomID:       roomID,
 		TypingUserID: userID,
 		IsTyping:     isTyping,
 	}

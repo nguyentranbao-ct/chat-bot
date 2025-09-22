@@ -23,16 +23,19 @@ React-based frontend for the chat-bot application, designed to match the Moshee 
 ## Setup
 
 1. Install dependencies:
+
    ```bash
    npm install
    ```
 
 2. Copy environment configuration:
+
    ```bash
    cp .env.example .env
    ```
 
 3. Update `.env` with your API URLs:
+
    ```
    REACT_APP_API_URL=http://localhost:8080/api/v1
    REACT_APP_WS_URL=ws://localhost:8080
@@ -55,7 +58,7 @@ npm run build
 
 - `LoginPage`: Email-based authentication
 - `ChatPage`: Main chat interface
-- `ConversationList`: Channel/conversation sidebar
+- `ConversationList`: Room/conversation sidebar
 - `ChatWindow`: Main chat area with message display
 - `MessageInput`: Message composition input
 - `AIAssistant`: AI suggestions panel
@@ -66,10 +69,10 @@ npm run build
 The frontend integrates with the Go backend API:
 
 - `POST /api/v1/auth/login` - Email login
-- `GET /api/v1/chat/channels` - Get user channels
-- `GET /api/v1/chat/channels/:id/messages` - Get channel messages
-- `POST /api/v1/chat/channels/:id/messages` - Send message
-- `POST /api/v1/chat/channels/:id/read` - Mark as read
+- `GET /api/v1/chat/rooms` - Get user rooms
+- `GET /api/v1/chat/rooms/:id/messages` - Get room messages
+- `POST /api/v1/chat/rooms/:id/messages` - Send message
+- `POST /api/v1/chat/rooms/:id/read` - Mark as read
 
 ## Socket.IO Events
 

@@ -64,7 +64,7 @@ internal/
 - **Defer expensive operations**: Don't create sessions or initialize LLM until all prechecks pass
 - **Early exit pattern**: Return immediately if validation fails, whitelist checks fail, or conditions not met
 - Validate chat mode exists and has required fields before proceeding
-- Check user permissions and channel access before session creation
+- Check user permissions and room access before session creation
 
 ### 6. Implementation Steps
 

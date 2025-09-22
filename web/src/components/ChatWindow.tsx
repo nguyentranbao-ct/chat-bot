@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Channel, ChatMessage, SendMessageRequest } from '../types';
+import { Room, ChatMessage, SendMessageRequest } from '../types';
 import MessageInput from './MessageInput';
 import AIAssistant from './AIAssistant';
 
 interface ChatWindowProps {
-  channel: Channel;
+  room: Room;
   messages: ChatMessage[];
   currentUserId: string;
   onSendMessage: (message: SendMessageRequest) => void;
@@ -13,7 +13,7 @@ interface ChatWindowProps {
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
-  channel,
+  room,
   messages,
   currentUserId,
   onSendMessage,
@@ -93,16 +93,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                 <span className="text-blue-600 font-medium text-sm">
-                  {channel.name?.substring(0, 2).toUpperCase() || 'CH'}
+                  {room.name?.substring(0, 2).toUpperCase() || 'CH'}
                 </span>
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
-                  {channel.name || 'Unnamed Channel'}
+                  {room.name || 'Unnamed Room'}
                 </h2>
                 <div className="text-sm text-gray-500">
-                  {channel.item_name && <span>{channel.item_name}</span>}
-                  {channel.item_price && <span> • {channel.item_price}</span>}
+                  {room.item_name && <span>{room.item_name}</span>}
+                  {room.item_price && <span> • {room.item_price}</span>}
                 </div>
               </div>
             </div>
@@ -184,7 +184,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       </div>
 
       {/* AI Assistant Panel */}
-      <AIAssistant channel={channel} />
+      <AIAssistant room={room} />
     </div>
   );
 };

@@ -17,7 +17,7 @@ import (
 
 const (
 	ToolName        = "ReplyMessage"
-	ToolDescription = "Send a reply message to the user in the current chat channel. ALWAYS use this tool at least once to respond to the user's message. You can call this tool multiple times but do not repeating the same message."
+	ToolDescription = "Send a reply message to the user in the current chat room. ALWAYS use this tool at least once to respond to the user's message. You can call this tool multiple times but do not repeating the same message."
 )
 
 // ReplyMessageArgs defines the arguments for the ReplyMessage tool
@@ -69,9 +69,9 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 
 	// Send the message via internal API
 	req := internal_api.SendMessageRequest{
-		ChannelID: session.GetChannelID().Hex(),
-		SenderID:  session.GetMerchantID().Hex(),
-		Content:   replyArgs.Message,
+		RoomID:   session.GetRoomID().Hex(),
+		SenderID: session.GetMerchantID().Hex(),
+		Content:  replyArgs.Message,
 	}
 
 	if err := t.internalAPIClient.SendMessage(ctx, req); err != nil {
@@ -83,7 +83,7 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 		log.Errorf(ctx, "Failed to log ReplyMessage activity: %v", err)
 	}
 
-	log.Infof(ctx, "Message sent to channel %s: %s", session.GetChannelID(), replyArgs.Message)
+	log.Infof(ctx, "Message sent to room %s: %s", session.GetRoomID(), replyArgs.Message)
 	return "Message sent successfully", nil
 }
 
@@ -122,7 +122,7 @@ func (t *tool) parseArgs(args interface{}, target interface{}) error {
 func (t *tool) logActivity(ctx context.Context, args ReplyMessageArgs, session toolsmanager.SessionContext) error {
 	activity := &models.ChatActivity{
 		SessionID: session.GetSessionID(),
-		ChannelID: session.GetChannelID(),
+		RoomID:    session.GetRoomID(),
 		Action:    models.ActivityReplyMessage,
 		Data:      args,
 	}

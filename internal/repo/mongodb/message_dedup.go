@@ -15,7 +15,7 @@ import (
 type MessageDeduplication struct {
 	ID                primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	ExternalMessageID string             `bson:"external_message_id" json:"external_message_id"`
-	ChannelID         string             `bson:"channel_id" json:"channel_id"`
+	RoomID            string             `bson:"room_id" json:"room_id"`
 	PartnerName       string             `bson:"partner_name" json:"partner_name"`
 	MessageHash       string             `bson:"message_hash" json:"message_hash"`
 	SenderID          string             `bson:"sender_id" json:"sender_id"`
@@ -27,11 +27,11 @@ type MessageDeduplication struct {
 
 // MessageDedupRepository handles message deduplication operations
 type MessageDedupRepository interface {
-	IsMessageProcessed(ctx context.Context, externalMessageID, channelID, partnerName string) (bool, error)
-	IsMessageDuplicate(ctx context.Context, messageHash, channelID string, withinDuration time.Duration) (bool, error)
+	IsMessageProcessed(ctx context.Context, externalMessageID, roomID, partnerName string) (bool, error)
+	IsMessageDuplicate(ctx context.Context, messageHash, roomID string, withinDuration time.Duration) (bool, error)
 	RecordProcessedMessage(ctx context.Context, record *MessageDeduplication) error
 	CleanupExpiredRecords(ctx context.Context) error
-	GetRecentMessages(ctx context.Context, channelID string, limit int, withinDuration time.Duration) ([]*MessageDeduplication, error)
+	GetRecentMessages(ctx context.Context, roomID string, limit int, withinDuration time.Duration) ([]*MessageDeduplication, error)
 }
 
 type messageDedupRepo struct {
@@ -62,31 +62,31 @@ func (r *messageDedupRepo) createIndexes(ctx context.Context) {
 	externalMsgIndex := mongo.IndexModel{
 		Keys: bson.D{
 			{Key: "external_message_id", Value: 1},
-			{Key: "channel_id", Value: 1},
+			{Key: "room_id", Value: 1},
 			{Key: "partner_name", Value: 1},
 		},
 		Options: options.Index().
 			SetUnique(true).
-			SetName("external_msg_channel_partner"),
+			SetName("external_msg_room_partner"),
 	}
 
 	// Compound index for message hash lookup
 	hashIndex := mongo.IndexModel{
 		Keys: bson.D{
 			{Key: "message_hash", Value: 1},
-			{Key: "channel_id", Value: 1},
+			{Key: "room_id", Value: 1},
 			{Key: "processed_at", Value: -1},
 		},
-		Options: options.Index().SetName("hash_channel_time"),
+		Options: options.Index().SetName("hash_room_time"),
 	}
 
 	// Index for recent message queries
 	recentIndex := mongo.IndexModel{
 		Keys: bson.D{
-			{Key: "channel_id", Value: 1},
+			{Key: "room_id", Value: 1},
 			{Key: "processed_at", Value: -1},
 		},
-		Options: options.Index().SetName("channel_recent"),
+		Options: options.Index().SetName("room_recent"),
 	}
 
 	indexes := []mongo.IndexModel{ttlIndex, externalMsgIndex, hashIndex, recentIndex}
@@ -98,14 +98,14 @@ func (r *messageDedupRepo) createIndexes(ctx context.Context) {
 	}
 }
 
-func (r *messageDedupRepo) IsMessageProcessed(ctx context.Context, externalMessageID, channelID, partnerName string) (bool, error) {
+func (r *messageDedupRepo) IsMessageProcessed(ctx context.Context, externalMessageID, roomID, partnerName string) (bool, error) {
 	if externalMessageID == "" {
 		return false, nil // Can't check without external ID
 	}
 
 	filter := bson.M{
 		"external_message_id": externalMessageID,
-		"channel_id":          channelID,
+		"room_id":             roomID,
 		"partner_name":        partnerName,
 	}
 
@@ -117,7 +117,7 @@ func (r *messageDedupRepo) IsMessageProcessed(ctx context.Context, externalMessa
 	return count > 0, nil
 }
 
-func (r *messageDedupRepo) IsMessageDuplicate(ctx context.Context, messageHash, channelID string, withinDuration time.Duration) (bool, error) {
+func (r *messageDedupRepo) IsMessageDuplicate(ctx context.Context, messageHash, roomID string, withinDuration time.Duration) (bool, error) {
 	if messageHash == "" {
 		return false, nil // Can't check without hash
 	}
@@ -125,7 +125,7 @@ func (r *messageDedupRepo) IsMessageDuplicate(ctx context.Context, messageHash, 
 	cutoffTime := time.Now().Add(-withinDuration)
 	filter := bson.M{
 		"message_hash": messageHash,
-		"channel_id":   channelID,
+		"room_id":      roomID,
 		"processed_at": bson.M{"$gte": cutoffTime},
 	}
 
@@ -156,7 +156,7 @@ func (r *messageDedupRepo) RecordProcessedMessage(ctx context.Context, record *M
 	// Use upsert to handle potential race conditions
 	filter := bson.M{
 		"external_message_id": record.ExternalMessageID,
-		"channel_id":          record.ChannelID,
+		"room_id":             record.RoomID,
 		"partner_name":        record.PartnerName,
 	}
 
@@ -172,17 +172,17 @@ func (r *messageDedupRepo) RecordProcessedMessage(ctx context.Context, record *M
 
 	// If the document was not inserted (UpsertedCount == 0), it means it already existed
 	if result.UpsertedCount == 0 {
-		return fmt.Errorf("message already processed: external_id=%s, channel=%s, partner=%s",
-			record.ExternalMessageID, record.ChannelID, record.PartnerName)
+		return fmt.Errorf("message already processed: external_id=%s, room=%s, partner=%s",
+			record.ExternalMessageID, record.RoomID, record.PartnerName)
 	}
 
 	return nil
 }
 
-func (r *messageDedupRepo) GetRecentMessages(ctx context.Context, channelID string, limit int, withinDuration time.Duration) ([]*MessageDeduplication, error) {
+func (r *messageDedupRepo) GetRecentMessages(ctx context.Context, roomID string, limit int, withinDuration time.Duration) ([]*MessageDeduplication, error) {
 	cutoffTime := time.Now().Add(-withinDuration)
 	filter := bson.M{
-		"channel_id":   channelID,
+		"room_id":      roomID,
 		"processed_at": bson.M{"$gte": cutoffTime},
 	}
 

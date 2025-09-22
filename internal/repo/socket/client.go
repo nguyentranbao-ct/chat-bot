@@ -89,15 +89,15 @@ func (c *Client) SendEvents(ctx context.Context, events []Event) error {
 }
 
 type BroadcastMessageArgs struct {
-	ChannelID string
-	Message   *models.ChatMessage
+	RoomID  string
+	Message *models.ChatMessage
 }
 
-// BroadcastMessage sends a message_received event to a specific channel
+// BroadcastMessage sends a message_received event to a specific room
 // This method is deprecated and should not be used - use BroadcastMessageToUsers instead
 func (c *Client) BroadcastMessage(ctx context.Context, args BroadcastMessageArgs) error {
-	// This method is deprecated - channel-based broadcasting should not be used
-	// Instead, get channel members and use BroadcastMessageToUsers
+	// This method is deprecated - room-based broadcasting should not be used
+	// Instead, get room members and use BroadcastMessageToUsers
 	return fmt.Errorf("BroadcastMessage is deprecated - use BroadcastMessageToUsers instead")
 }
 
@@ -119,42 +119,42 @@ func (c *Client) BroadcastMessageSent(ctx context.Context, args BroadcastMessage
 }
 
 type BroadcastTypingArgs struct {
-	ChannelID string
-	UserID    string
-	IsTyping  bool
+	RoomID   string
+	UserID   string
+	IsTyping bool
 }
 
-// BroadcastTyping sends typing indicator to channel members
+// BroadcastTyping sends typing indicator to room members
 // This method is deprecated and should not be used - use BroadcastTypingToUsers instead
 func (c *Client) BroadcastTyping(ctx context.Context, args BroadcastTypingArgs) error {
-	// This method is deprecated - channel-based broadcasting should not be used
-	// Instead, get channel members and use BroadcastTypingToUsers
+	// This method is deprecated - room-based broadcasting should not be used
+	// Instead, get room members and use BroadcastTypingToUsers
 	return fmt.Errorf("BroadcastTyping is deprecated - use BroadcastTypingToUsers instead")
 }
 
 type BroadcastUserJoinedArgs struct {
-	ChannelID string
-	UserID    string
+	RoomID string
+	UserID string
 }
 
-// BroadcastUserJoined notifies channel members when a user joins
+// BroadcastUserJoined notifies room members when a user joins
 // This method is deprecated and should not be used - use BroadcastUserJoinedToUsers instead
 func (c *Client) BroadcastUserJoined(ctx context.Context, args BroadcastUserJoinedArgs) error {
-	// This method is deprecated - channel-based broadcasting should not be used
-	// Instead, get channel members and use BroadcastUserJoinedToUsers
+	// This method is deprecated - room-based broadcasting should not be used
+	// Instead, get room members and use BroadcastUserJoinedToUsers
 	return fmt.Errorf("BroadcastUserJoined is deprecated - use BroadcastUserJoinedToUsers instead")
 }
 
 type BroadcastUserLeftArgs struct {
-	ChannelID string
-	UserID    string
+	RoomID string
+	UserID string
 }
 
-// BroadcastUserLeft notifies channel members when a user leaves
+// BroadcastUserLeft notifies room members when a user leaves
 // This method is deprecated and should not be used - use BroadcastUserLeftToUsers instead
 func (c *Client) BroadcastUserLeft(ctx context.Context, args BroadcastUserLeftArgs) error {
-	// This method is deprecated - channel-based broadcasting should not be used
-	// Instead, get channel members and use BroadcastUserLeftToUsers
+	// This method is deprecated - room-based broadcasting should not be used
+	// Instead, get room members and use BroadcastUserLeftToUsers
 	return fmt.Errorf("BroadcastUserLeft is deprecated - use BroadcastUserLeftToUsers instead")
 }
 
@@ -185,7 +185,7 @@ func (c *Client) BroadcastMessageToUsers(ctx context.Context, args BroadcastMess
 
 type BroadcastTypingToUsersArgs struct {
 	UserIDs      []string
-	ChannelID    string
+	RoomID       string
 	TypingUserID string
 	IsTyping     bool
 }
@@ -213,9 +213,9 @@ func (c *Client) BroadcastTypingToUsers(ctx context.Context, args BroadcastTypin
 			Platform: "web",
 			Name:     eventName,
 			Data: map[string]interface{}{
-				"user_id":    args.TypingUserID,
-				"channel_id": args.ChannelID,
-				"is_typing":  args.IsTyping,
+				"user_id":   args.TypingUserID,
+				"room_id":   args.RoomID,
+				"is_typing": args.IsTyping,
 			},
 		}
 		events = append(events, event)
@@ -226,7 +226,7 @@ func (c *Client) BroadcastTypingToUsers(ctx context.Context, args BroadcastTypin
 
 type BroadcastUserJoinedToUsersArgs struct {
 	UserIDs      []string
-	ChannelID    string
+	RoomID       string
 	JoinedUserID string
 }
 
@@ -243,8 +243,8 @@ func (c *Client) BroadcastUserJoinedToUsers(ctx context.Context, args BroadcastU
 			Platform: "web",
 			Name:     "user_joined",
 			Data: map[string]interface{}{
-				"user_id":    args.JoinedUserID,
-				"channel_id": args.ChannelID,
+				"user_id": args.JoinedUserID,
+				"room_id": args.RoomID,
 			},
 		}
 		events = append(events, event)
@@ -255,7 +255,7 @@ func (c *Client) BroadcastUserJoinedToUsers(ctx context.Context, args BroadcastU
 
 type BroadcastUserLeftToUsersArgs struct {
 	UserIDs    []string
-	ChannelID  string
+	RoomID     string
 	LeftUserID string
 }
 
@@ -272,8 +272,8 @@ func (c *Client) BroadcastUserLeftToUsers(ctx context.Context, args BroadcastUse
 			Platform: "web",
 			Name:     "user_left",
 			Data: map[string]interface{}{
-				"user_id":    args.LeftUserID,
-				"channel_id": args.ChannelID,
+				"user_id": args.LeftUserID,
+				"room_id": args.RoomID,
 			},
 		}
 		events = append(events, event)

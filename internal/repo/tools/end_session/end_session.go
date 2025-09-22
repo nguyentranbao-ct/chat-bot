@@ -111,7 +111,7 @@ func (t *tool) parseArgs(args interface{}, target interface{}) error {
 func (t *tool) logActivity(ctx context.Context, args EndSessionArgs, session toolsmanager.SessionContext) error {
 	activity := &models.ChatActivity{
 		SessionID: session.GetSessionID(),
-		ChannelID: session.GetChannelID(),
+		RoomID:    session.GetRoomID(),
 		Action:    models.ActivityEndSession,
 		Data:      args,
 	}

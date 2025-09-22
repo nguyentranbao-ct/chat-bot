@@ -13,7 +13,7 @@ import (
 )
 
 type LLMUsecaseV2 interface {
-	TriggerLLM(ctx context.Context, message *models.ChatMessage, channel *models.Channel) error
+	TriggerLLM(ctx context.Context, message *models.ChatMessage, room *models.Room) error
 }
 
 type llmUsecaseV2 struct {
@@ -21,7 +21,7 @@ type llmUsecaseV2 struct {
 	userAttributeRepo mongodb.UserAttributeRepository
 	chatModeRepo      mongodb.ChatModeRepository
 	sessionRepo       mongodb.ChatSessionRepository
-	channelMemberRepo mongodb.ChannelMemberRepository
+	roomMemberRepo    mongodb.RoomMemberRepository
 	messageRepo       mongodb.ChatMessageRepository
 	llmUsecase        LLMUsecase
 }
@@ -31,7 +31,7 @@ func NewLLMUsecaseV2(
 	userAttributeRepo mongodb.UserAttributeRepository,
 	chatModeRepo mongodb.ChatModeRepository,
 	sessionRepo mongodb.ChatSessionRepository,
-	channelMemberRepo mongodb.ChannelMemberRepository,
+	roomMemberRepo mongodb.RoomMemberRepository,
 	messageRepo mongodb.ChatMessageRepository,
 	llmUsecase LLMUsecase,
 ) LLMUsecaseV2 {
@@ -40,17 +40,17 @@ func NewLLMUsecaseV2(
 		userAttributeRepo: userAttributeRepo,
 		chatModeRepo:      chatModeRepo,
 		sessionRepo:       sessionRepo,
-		channelMemberRepo: channelMemberRepo,
+		roomMemberRepo:    roomMemberRepo,
 		messageRepo:       messageRepo,
 		llmUsecase:        llmUsecase,
 	}
 }
 
-func (uc *llmUsecaseV2) TriggerLLM(ctx context.Context, message *models.ChatMessage, channel *models.Channel) error {
+func (uc *llmUsecaseV2) TriggerLLM(ctx context.Context, message *models.ChatMessage, room *models.Room) error {
 	ctx, cancel := util.NewTimeoutContext(ctx, 180*time.Second)
 	defer cancel()
 
-	log.Infof(ctx, "Processing LLM trigger for message from user %s in channel %s", message.SenderID.Hex(), channel.Source.ChannelID)
+	log.Infof(ctx, "Processing LLM trigger for message from user %s in room %s", message.SenderID.Hex(), room.Source.RoomID)
 
 	user, err := uc.userRepo.GetByID(ctx, message.SenderID)
 	if err != nil {
@@ -62,31 +62,31 @@ func (uc *llmUsecaseV2) TriggerLLM(ctx context.Context, message *models.ChatMess
 		return nil
 	}
 
-	chatModeKey := fmt.Sprintf("%s_chat_mode", channel.Source.Name)
+	chatModeKey := fmt.Sprintf("%s_chat_mode", room.Source.Name)
 
 	chatMode, err := uc.getChatModeForUser(ctx, message.SenderID, chatModeKey)
 	if err != nil {
 		return fmt.Errorf("failed to get chat mode for user %s: %w", message.SenderID.Hex(), err)
 	}
 
-	session, err := uc.createSession(ctx, message, channel, chatMode)
+	session, err := uc.createSession(ctx, message, room, chatMode)
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
 
-	merchantID, buyerID, err := uc.findMerchantAndBuyer(ctx, channel.ID, message.SenderID)
+	merchantID, buyerID, err := uc.findMerchantAndBuyer(ctx, room.ID, message.SenderID)
 	if err != nil {
 		return fmt.Errorf("failed to find merchant and buyer: %w", err)
 	}
 
-	recentMessages, err := uc.fetchRecentMessages(ctx, channel.ID, 5)
+	recentMessages, err := uc.fetchRecentMessages(ctx, room.ID, 5)
 	if err != nil {
 		log.Warnf(ctx, "Failed to fetch recent messages: %v", err)
 		recentMessages = &models.MessageHistory{Messages: []models.HistoryMessage{}}
 	}
 
 	promptContext := &PromptContext{
-		Channel:        channel,
+		Room:           room,
 		SessionID:      session.ID,
 		Message:        message.Content,
 		RecentMessages: recentMessages,
@@ -120,10 +120,10 @@ func (uc *llmUsecaseV2) getChatModeForUser(ctx context.Context, userID primitive
 	return chatMode, nil
 }
 
-func (uc *llmUsecaseV2) findMerchantAndBuyer(ctx context.Context, channelID primitive.ObjectID, messageSenderID primitive.ObjectID) (merchantID, buyerID primitive.ObjectID, err error) {
-	members, err := uc.channelMemberRepo.GetChannelMembers(ctx, channelID)
+func (uc *llmUsecaseV2) findMerchantAndBuyer(ctx context.Context, roomID primitive.ObjectID, messageSenderID primitive.ObjectID) (merchantID, buyerID primitive.ObjectID, err error) {
+	members, err := uc.roomMemberRepo.GetRoomMembers(ctx, roomID)
 	if err != nil {
-		return primitive.NilObjectID, primitive.NilObjectID, fmt.Errorf("failed to get channel members: %w", err)
+		return primitive.NilObjectID, primitive.NilObjectID, fmt.Errorf("failed to get room members: %w", err)
 	}
 
 	var internalUserID, externalUserID primitive.ObjectID
@@ -142,14 +142,14 @@ func (uc *llmUsecaseV2) findMerchantAndBuyer(ctx context.Context, channelID prim
 	}
 
 	if internalUserID == primitive.NilObjectID || externalUserID == primitive.NilObjectID {
-		return primitive.NilObjectID, primitive.NilObjectID, fmt.Errorf("could not find both internal and external users in channel")
+		return primitive.NilObjectID, primitive.NilObjectID, fmt.Errorf("could not find both internal and external users in room")
 	}
 
 	return internalUserID, externalUserID, nil
 }
 
-func (uc *llmUsecaseV2) fetchRecentMessages(ctx context.Context, channelID primitive.ObjectID, limit int) (*models.MessageHistory, error) {
-	messages, err := uc.messageRepo.GetChannelMessages(ctx, channelID, limit, nil)
+func (uc *llmUsecaseV2) fetchRecentMessages(ctx context.Context, roomID primitive.ObjectID, limit int) (*models.MessageHistory, error) {
+	messages, err := uc.messageRepo.GetRoomMessages(ctx, roomID, limit, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch messages from database: %w", err)
 	}
@@ -162,7 +162,7 @@ func (uc *llmUsecaseV2) fetchRecentMessages(ctx context.Context, channelID primi
 	for i, msg := range messages {
 		history.Messages[i] = models.HistoryMessage{
 			ID:        msg.ID.Hex(),
-			ChannelID: msg.ChannelID,
+			RoomID:    msg.RoomID,
 			SenderID:  msg.SenderID,
 			Content:   msg.Content,
 			CreatedAt: msg.CreatedAt,
@@ -172,17 +172,17 @@ func (uc *llmUsecaseV2) fetchRecentMessages(ctx context.Context, channelID primi
 	return history, nil
 }
 
-func (uc *llmUsecaseV2) createSession(ctx context.Context, message *models.ChatMessage, channel *models.Channel, chatMode *models.ChatMode) (*models.ChatSession, error) {
+func (uc *llmUsecaseV2) createSession(ctx context.Context, message *models.ChatMessage, room *models.Room, chatMode *models.ChatMode) (*models.ChatSession, error) {
 	session := &models.ChatSession{
-		ChannelID: channel.ID,
-		ChatMode:  chatMode.ID,
-		Status:    models.SessionStatusActive,
+		RoomID:   room.ID,
+		ChatMode: chatMode.ID,
+		Status:   models.SessionStatusActive,
 	}
 
 	if err := uc.sessionRepo.Create(ctx, session); err != nil {
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
-	log.Infof(ctx, "Created new session %s for user %s in channel %s", session.ID.Hex(), message.SenderID.Hex(), channel.Source.ChannelID)
+	log.Infof(ctx, "Created new session %s for user %s in room %s", session.ID.Hex(), message.SenderID.Hex(), room.Source.RoomID)
 	return session, nil
 }

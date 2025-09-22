@@ -15,7 +15,7 @@ type Client interface {
 }
 
 type SendMessageRequest struct {
-	ChannelID   string `json:"channel_id" validate:"required"`
+	RoomID      string `json:"room_id" validate:"required"`
 	SenderID    string `json:"sender_id" validate:"required"`
 	Content     string `json:"content" validate:"required"`
 	SkipPartner bool   `json:"skip_partner,omitempty"`

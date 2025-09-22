@@ -32,7 +32,7 @@ type KafkaMessageData struct {
 
 // IncomingMessage represents the simplified message structure for internal processing
 type IncomingMessage struct {
-	ChannelID string              `json:"channel_id" validate:"required"`
+	RoomID    string              `json:"room_id" validate:"required"`
 	CreatedAt int64               `json:"created_at" validate:"required"`
 	SenderID  string              `json:"sender_id" validate:"required"`
 	Content   string              `json:"content" validate:"required"`
@@ -49,14 +49,14 @@ type LLMMetadata struct {
 }
 
 type Source struct {
-	Name      string `json:"name"`
-	ChannelID string `json:"channel_id"`
-	MsgID     string `json:"msg_id"`
+	Name   string `json:"name"`
+	RoomID string `json:"room_id"`
+	MsgID  string `json:"msg_id"`
 }
 
 // ProcessIncomingMessageParams contains parameters for processing incoming messages with partner detection
 type ProcessIncomingMessageParams struct {
-	ChannelID string                 `json:"channel_id" validate:"required"`
+	RoomID    string                 `json:"room_id" validate:"required"`
 	SenderID  string                 `json:"sender_id" validate:"required"`
 	Content   string                 `json:"content" validate:"required"`
 	CreatedAt int64                  `json:"created_at" validate:"required"`
@@ -65,13 +65,13 @@ type ProcessIncomingMessageParams struct {
 }
 
 type OutgoingMessage struct {
-	ChannelID string `json:"channel_id" validate:"required"`
-	SenderID  string `json:"sender_id" validate:"required"`
-	Message   string `json:"message" validate:"required"`
-	Partner   Source `json:"partner"`
+	RoomID   string `json:"room_id" validate:"required"`
+	SenderID string `json:"sender_id" validate:"required"`
+	Message  string `json:"message" validate:"required"`
+	Partner  Source `json:"partner"`
 }
 
-type ChannelInfo struct {
+type RoomInfo struct {
 	ID           string        `json:"id"`
 	Name         string        `json:"name"`
 	ItemName     string        `json:"item_name"`
@@ -92,7 +92,7 @@ type MessageHistory struct {
 
 type HistoryMessage struct {
 	ID        string             `json:"id"`
-	ChannelID primitive.ObjectID `json:"channel_id"`
+	RoomID    primitive.ObjectID `json:"room_id"`
 	SenderID  primitive.ObjectID `json:"sender_id"`
 	Content   string             `json:"content"`
 	CreatedAt time.Time          `json:"created_at"`

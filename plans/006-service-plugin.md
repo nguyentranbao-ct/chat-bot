@@ -7,8 +7,8 @@ Create a partner abstraction layer to support multiple messaging platforms (Chot
 ## Key Clarifications
 
 - **chat-api is Chotot's chat platform** - unified Chotot partner handles both chat and products
-- **Remove ItemName/ItemPrice from Channel** - use flexible Metadata instead
-- **Replace ExternalChannelID with Partner field** - structure: `{ChannelID: "external_id", Name: "chotot|facebook..."}`
+- **Remove ItemName/ItemPrice from Room** - use flexible Metadata instead
+- **Replace ExternalRoomID with Partner field** - structure: `{RoomID: "external_id", Name: "chotot|facebook..."}`
 
 ## Architecture Components
 
@@ -16,9 +16,9 @@ Create a partner abstraction layer to support multiple messaging platforms (Chot
 
 - **Location**: `internal/repo/partners/partner.go`
 - Define `Partner` interface with core messaging operations:
-  - `ListMessages(ctx, channelID, limit, beforeTs) ([]Message, error)`
-  - `SendMessage(ctx, channelID, senderID, content) error`
-  - `GetChannelInfo(ctx, channelID) (*ChannelInfo, error)`
+  - `ListMessages(ctx, roomID, limit, beforeTs) ([]Message, error)`
+  - `SendMessage(ctx, roomID, senderID, content) error`
+  - `GetRoomInfo(ctx, roomID) (*RoomInfo, error)`
   - `GetUserProducts(ctx, userID, limit, page) ([]Product, error)`
   - `GetPartnerType() string` (returns "chotot", "facebook", etc.)
 
@@ -33,15 +33,15 @@ Create a partner abstraction layer to support multiple messaging platforms (Chot
 
 - **Location**: `internal/repo/partners/registry.go`
 - `PartnerRegistry` to manage partner instances
-- `DetectPartner(channelID) Partner` logic based on channel.Partner.Name
+- `DetectPartner(roomID) Partner` logic based on room.Partner.Name
 - Support for multiple partners per system
 
-### 4. Enhanced Channel Model
+### 4. Enhanced Room Model
 
 ```go
-type Channel struct {
+type Room struct {
     ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-    Partner    ChannelPartner      `bson:"partner" json:"partner"`
+    Partner    RoomPartner      `bson:"partner" json:"partner"`
     Name      string             `bson:"name" json:"name"`
     Context   string             `bson:"context" json:"context"`
     Type      string             `bson:"type" json:"type"`
@@ -49,15 +49,15 @@ type Channel struct {
     // ... other fields
 }
 
-type ChannelPartner struct {
-    ChannelID string `bson:"channel_id" json:"channel_id"` // external partner channel ID
+type RoomPartner struct {
+    RoomID string `bson:"room_id" json:"room_id"` // external partner room ID
     Name      string `bson:"name" json:"name"`             // "chotot", "facebook", etc.
 }
 ```
 
 ### 5. Message Sync Architecture
 
-- **Inbound Flow**: Kafka → PartnerDetection → Channel creation/lookup → Message persistence → Socket broadcast
+- **Inbound Flow**: Kafka → PartnerDetection → Room creation/lookup → Message persistence → Socket broadcast
 - **Outbound Flow**: API send → Message persistence → Partner detection → External partner send
 - **Loop Prevention**:
   - Track message source (kafka vs api)
@@ -68,7 +68,7 @@ type ChannelPartner struct {
 
 - Update `ChatUseCase.ProcessIncomingMessage` to use partner detection
 - Update `ChatUseCase.SendMessage` to support partner-specific sending
-- Add partner-aware channel synchronization methods
+- Add partner-aware room synchronization methods
 
 ## Questions/Uncertainties
 
@@ -80,31 +80,31 @@ type ChannelPartner struct {
    - How long should we retain deduplication records?
    - **My Recommendation**: Use external message IDs with 24-hour retention window
 
-2. **Partner Priority**: When multiple partners support the same channel, which takes precedence?
+2. **Partner Priority**: When multiple partners support the same room, which takes precedence?
 
-   - **My Recommendation**: Use channel.Partner.Name as authoritative source
+   - **My Recommendation**: Use room.Partner.Name as authoritative source
 
 3. **Error Handling**: How should we handle partial partner failures (e.g., Chotot down)?
 
    - **My Recommendation**: Continue processing with graceful degradation, log failures
 
 4. **Configuration**: Should partner detection be:
-   - Based on channel.Partner.Name (recommended)
+   - Based on room.Partner.Name (recommended)
    - Fallback pattern-based detection for migration
 
 ### Data Model Questions:
 
-1. **Backward Compatibility**: How should we handle existing channels with ExternalChannelID?
+1. **Backward Compatibility**: How should we handle existing rooms with ExternalRoomID?
 
-   - **My Recommendation**: Migrate ExternalChannelID → Partner{ChannelID: old_external_id, Name: "chotot"}
+   - **My Recommendation**: Migrate ExternalRoomID → Partner{RoomID: old_external_id, Name: "chotot"}
 
 2. **Metadata Schema**: What should go in flexible Metadata field?
 
    - ItemName, ItemPrice (from current model)
-   - Partner-specific channel settings
-   - Custom channel properties
+   - Partner-specific room settings
+   - Custom room properties
 
-3. **Sync State**: Do we need per-channel, per-partner sync status tracking?
+3. **Sync State**: Do we need per-room, per-partner sync status tracking?
    - **My Recommendation**: Add sync tracking to prevent infinite loops
 
 ## Implementation Steps
@@ -117,9 +117,9 @@ type ChannelPartner struct {
 
 ### Phase 2: Data Model Enhancement
 
-4. Update Channel model: remove ItemName/ItemPrice, replace ExternalChannelID with Partner field
-5. Create database migration for existing channels
-6. Update repository interfaces to support new channel structure
+4. Update Room model: remove ItemName/ItemPrice, replace ExternalRoomID with Partner field
+5. Create database migration for existing rooms
+6. Update repository interfaces to support new room structure
 
 ### Phase 3: Message Flow Integration
 
@@ -152,21 +152,21 @@ API → ChatUseCase.SendMessage → Chat DB + PartnerRouting → External Partne
 
 ### Migration Strategy
 
-1. **Channel Model Migration**:
+1. **Room Model Migration**:
 
    ```sql
-   // Migrate existing channels
-   db.channels.updateMany(
+   // Migrate existing rooms
+   db.rooms.updateMany(
      { partner: { $exists: false } },
      {
        $set: {
          partner: {
-           channel_id: "$external_channel_id",
+           room_id: "$external_room_id",
            name: "chotot"
          }
        },
        $unset: {
-         external_channel_id: "",
+         external_room_id: "",
          item_name: "",
          item_price: ""
        }
@@ -192,7 +192,7 @@ API → ChatUseCase.SendMessage → Chat DB + PartnerRouting → External Partne
 - Unit tests for unified Chotot partner implementation
 - Integration tests for bidirectional sync scenarios
 - Load tests for loop prevention mechanisms
-- Channel migration testing
+- Room migration testing
 - Backward compatibility testing
 
-This plan provides a cleaner, unified approach with Chotot as the primary partner and a flexible channel model ready for future platforms.
+This plan provides a cleaner, unified approach with Chotot as the primary partner and a flexible room model ready for future platforms.

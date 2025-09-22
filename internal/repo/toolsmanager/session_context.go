@@ -23,7 +23,7 @@ type sessionContext struct {
 type SessionContextConfig struct {
 	Genkit      *genkit.Genkit
 	SessionID   primitive.ObjectID
-	ChannelID   primitive.ObjectID
+	RoomID      primitive.ObjectID
 	BuyerID     primitive.ObjectID
 	MerchantID  primitive.ObjectID
 	SessionRepo mongodb.ChatSessionRepository
@@ -52,9 +52,9 @@ func (s *sessionContext) GetSessionID() primitive.ObjectID {
 	return s.config.SessionID
 }
 
-// GetChannelID returns the channel ID
-func (s *sessionContext) GetChannelID() primitive.ObjectID {
-	return s.config.ChannelID
+// GetRoomID returns the room ID
+func (s *sessionContext) GetRoomID() primitive.ObjectID {
+	return s.config.RoomID
 }
 
 // GetBuyerID returns the user ID

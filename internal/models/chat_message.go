@@ -9,7 +9,7 @@ import (
 // ChatMessage represents a message in our chat system
 type ChatMessage struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	ChannelID primitive.ObjectID `bson:"channel_id" json:"channel_id" validate:"required"`
+	RoomID    primitive.ObjectID `bson:"room_id" json:"room_id" validate:"required"`
 	SenderID  primitive.ObjectID `bson:"sender_id" json:"sender_id" validate:"required"`
 	Content   string             `bson:"content" json:"content"` // plain text content
 	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
@@ -28,7 +28,7 @@ type MessageMetadata struct {
 // MessageEvent represents events for offline sync
 type MessageEvent struct {
 	ID        primitive.ObjectID     `bson:"_id,omitempty" json:"id"`
-	ChannelID primitive.ObjectID     `bson:"channel_id" json:"channel_id" validate:"required"`
+	RoomID    primitive.ObjectID     `bson:"room_id" json:"room_id" validate:"required"`
 	EventType string                 `bson:"event_type" json:"event_type"` // "message_sent", "message_updated", "message_deleted", "user_typing"
 	MessageID *primitive.ObjectID    `bson:"message_id" json:"message_id"`
 	UserID    primitive.ObjectID     `bson:"user_id" json:"user_id"`

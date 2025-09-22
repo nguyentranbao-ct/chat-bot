@@ -8,7 +8,7 @@ Implement Kafka consumer to process message events from the `chat.event.messages
 
 - Consume messages from Kafka topic: `chat.event.messages`
 - Kafka brokers: `kafka-08.ct.dev:9200`
-- Channel whitelist configuration to control which channels trigger processing
+- Room whitelist configuration to control which rooms trigger processing
 - Maintain existing HTTP API functionality
 - Integrate with current message processing pipeline
 
@@ -21,45 +21,51 @@ Implement Kafka consumer to process message events from the `chat.event.messages
   - Broker addresses
   - Topic name
   - Consumer group ID
-  - Channel whitelist settings
+  - Room whitelist settings
 
 ### 2. Kafka Consumer Implementation
 
 **File: `internal/kafka/consumer.go`**
+
 - Implement Kafka consumer with proper error handling
 - Message deserialization from Kafka to `models.IncomingMessage`
 - Consumer group management for scalability
 - Graceful shutdown handling
 
 **File: `internal/kafka/interfaces.go`**
+
 - Define interfaces for testability and abstraction
 
-### 3. Channel Whitelist Service
+### 3. Room Whitelist Service
 
 **File: `internal/service/whitelist.go`**
-- Implement channel whitelist checking
+
+- Implement room whitelist checking
 - Configuration-based or database-backed whitelist
 - Interface for easy testing and future extensions
 
 ### 4. Integration with Existing Pipeline
 
 **Modify: `internal/app/app.go`**
+
 - Add Kafka consumer to FX dependency injection
 - Wire whitelist service
 - Start Kafka consumer alongside HTTP server
 
 **Modify: `internal/usecase/message_usecase.go`**
+
 - Ensure message processing logic works for both HTTP and Kafka sources
 - Add source tracking for observability
 
 ### 5. Configuration Updates
 
 **Environment Variables:**
+
 ```
 KAFKA_BROKERS=kafka-08.ct.dev:9200
 KAFKA_TOPIC=chat.event.messages
 KAFKA_CONSUMER_GROUP=chat-bot-consumers
-KAFKA_CHANNEL_WHITELIST=channel1,channel2,channel3
+KAFKA_ROOM_WHITELIST=room1,room2,room3
 ```
 
 ### 6. Error Handling and Monitoring
@@ -79,12 +85,14 @@ KAFKA_CHANNEL_WHITELIST=channel1,channel2,channel3
 ## Files to Create/Modify
 
 ### New Files:
+
 - `internal/kafka/consumer.go`
 - `internal/kafka/interfaces.go`
 - `internal/service/whitelist.go`
 - `internal/service/interfaces.go`
 
 ### Modified Files:
+
 - `internal/config/config.go` - Add Kafka configuration
 - `internal/app/app.go` - Wire Kafka consumer
 - `internal/usecase/message_usecase.go` - Support multiple message sources
@@ -100,7 +108,7 @@ KAFKA_CHANNEL_WHITELIST=channel1,channel2,channel3
 
 ## Future Enhancements
 
-- Dynamic channel whitelist updates without restart
+- Dynamic room whitelist updates without restart
 - Message filtering at Kafka level using headers
 - Support for multiple topics
 - Dead letter queue implementation
@@ -109,8 +117,8 @@ KAFKA_CHANNEL_WHITELIST=channel1,channel2,channel3
 ## Success Criteria
 
 - [ ] Kafka consumer successfully connects to brokers
-- [ ] Messages from whitelisted channels are processed
-- [ ] Non-whitelisted channels are ignored
+- [ ] Messages from whitelisted rooms are processed
+- [ ] Non-whitelisted rooms are ignored
 - [ ] Existing HTTP API continues to work unchanged
 - [ ] Proper error handling and logging implemented
 - [ ] Unit and integration tests pass

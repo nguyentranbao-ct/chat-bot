@@ -8,8 +8,8 @@ interface SocketContextType {
   isConnected: boolean;
   connect: () => void;
   disconnect: () => void;
-  joinChannel: (channelId: string) => void;
-  leaveChannel: (channelId: string) => void;
+  joinRoom: (roomId: string) => void;
+  leaveRoom: (roomId: string) => void;
   onMessageReceived: (callback: (message: ChatMessage) => void) => void;
   onMessageSent: (callback: (message: ChatMessage) => void) => void;
   onTypingStart: (callback: (typing: TypingIndicator) => void) => void;
@@ -108,13 +108,13 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     };
   }, []);
 
-  const joinChannel = (channelId: string) => {
+  const joinRoom = (roomId: string) => {
     // With the new approach, users are automatically in their own room
     // Messages are sent directly to users based on user_id
     // No explicit join/leave needed
   };
 
-  const leaveChannel = (channelId: string) => {
+  const leaveRoom = (roomId: string) => {
     // No explicit leave needed with direct user messaging
   };
 
@@ -171,8 +171,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     isConnected,
     connect: connectSocket,
     disconnect: disconnectSocket,
-    joinChannel,
-    leaveChannel,
+    joinRoom,
+    leaveRoom,
     onMessageReceived,
     onMessageSent,
     onTypingStart,

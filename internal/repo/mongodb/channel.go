@@ -13,74 +13,74 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 )
 
-type ChannelRepository interface {
-	Create(ctx context.Context, channel *models.Channel) error
-	GetByID(ctx context.Context, id primitive.ObjectID) (*models.Channel, error)
-	GetByPartnerChannelID(ctx context.Context, partnerName, partnerChannelID string) (*models.Channel, error)
-	GetUserChannels(ctx context.Context, userID primitive.ObjectID) ([]*models.Channel, error)
-	UpdateLastMessage(ctx context.Context, channelID primitive.ObjectID) error
-	GetChannelsWithUnreadCount(ctx context.Context, userID primitive.ObjectID) ([]bson.M, error)
+type RoomRepository interface {
+	Create(ctx context.Context, room *models.Room) error
+	GetByID(ctx context.Context, id primitive.ObjectID) (*models.Room, error)
+	GetByPartnerRoomID(ctx context.Context, partnerName, partnerRoomID string) (*models.Room, error)
+	GetUserRooms(ctx context.Context, userID primitive.ObjectID) ([]*models.Room, error)
+	UpdateLastMessage(ctx context.Context, roomID primitive.ObjectID) error
+	GetRoomsWithUnreadCount(ctx context.Context, userID primitive.ObjectID) ([]bson.M, error)
 }
 
-type channelRepo struct {
+type roomRepo struct {
 	collection *mongo.Collection
 }
 
-func NewChannelRepository(db *DB) ChannelRepository {
-	return &channelRepo{
-		collection: db.Database.Collection("channels"),
+func NewRoomRepository(db *DB) RoomRepository {
+	return &roomRepo{
+		collection: db.Database.Collection("rooms"),
 	}
 }
 
-func (r *channelRepo) Create(ctx context.Context, channel *models.Channel) error {
-	channel.ID = primitive.NewObjectID()
-	channel.CreatedAt = time.Now()
-	channel.UpdatedAt = time.Now()
+func (r *roomRepo) Create(ctx context.Context, room *models.Room) error {
+	room.ID = primitive.NewObjectID()
+	room.CreatedAt = time.Now()
+	room.UpdatedAt = time.Now()
 
-	_, err := r.collection.InsertOne(ctx, channel)
+	_, err := r.collection.InsertOne(ctx, room)
 	if err != nil {
-		return fmt.Errorf("failed to create channel: %w", err)
+		return fmt.Errorf("failed to create room: %w", err)
 	}
 	return nil
 }
 
-func (r *channelRepo) GetByID(ctx context.Context, id primitive.ObjectID) (*models.Channel, error) {
-	var channel models.Channel
-	err := r.collection.FindOne(ctx, bson.M{"_id": id}).Decode(&channel)
+func (r *roomRepo) GetByID(ctx context.Context, id primitive.ObjectID) (*models.Room, error) {
+	var room models.Room
+	err := r.collection.FindOne(ctx, bson.M{"_id": id}).Decode(&room)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("channel not found")
+			return nil, fmt.Errorf("room not found")
 		}
-		return nil, fmt.Errorf("failed to get channel: %w", err)
+		return nil, fmt.Errorf("failed to get room: %w", err)
 	}
-	return &channel, nil
+	return &room, nil
 }
 
-// GetByPartnerChannelID finds a channel by partner name and partner channel ID
-func (r *channelRepo) GetByPartnerChannelID(ctx context.Context, partnerName, partnerChannelID string) (*models.Channel, error) {
-	var channel models.Channel
+// GetByPartnerRoomID finds a room by partner name and partner room ID
+func (r *roomRepo) GetByPartnerRoomID(ctx context.Context, partnerName, partnerRoomID string) (*models.Room, error) {
+	var room models.Room
 	filter := bson.M{
-		"partner.name":       partnerName,
-		"partner.channel_id": partnerChannelID,
+		"partner.name":    partnerName,
+		"partner.room_id": partnerRoomID,
 	}
-	err := r.collection.FindOne(ctx, filter).Decode(&channel)
+	err := r.collection.FindOne(ctx, filter).Decode(&room)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("channel not found")
+			return nil, fmt.Errorf("room not found")
 		}
-		return nil, fmt.Errorf("failed to get channel: %w", err)
+		return nil, fmt.Errorf("failed to get room: %w", err)
 	}
-	return &channel, nil
+	return &room, nil
 }
 
-func (r *channelRepo) GetUserChannels(ctx context.Context, userID primitive.ObjectID) ([]*models.Channel, error) {
-	// Join with channel_members to get user's channels
+func (r *roomRepo) GetUserRooms(ctx context.Context, userID primitive.ObjectID) ([]*models.Room, error) {
+	// Join with room_members to get user's rooms
 	pipeline := []bson.M{
 		{
 			"$lookup": bson.M{
-				"from":         "channel_members",
+				"from":         "room_members",
 				"localField":   "_id",
-				"foreignField": "channel_id",
+				"foreignField": "room_id",
 				"as":           "members",
 			},
 		},
@@ -101,16 +101,16 @@ func (r *channelRepo) GetUserChannels(ctx context.Context, userID primitive.Obje
 	}
 	defer cursor.Close(ctx)
 
-	var channels []*models.Channel
-	if err := cursor.All(ctx, &channels); err != nil {
+	var rooms []*models.Room
+	if err := cursor.All(ctx, &rooms); err != nil {
 		return nil, err
 	}
 
-	return channels, nil
+	return rooms, nil
 }
 
-func (r *channelRepo) UpdateLastMessage(ctx context.Context, channelID primitive.ObjectID) error {
-	filter := bson.M{"_id": channelID}
+func (r *roomRepo) UpdateLastMessage(ctx context.Context, roomID primitive.ObjectID) error {
+	filter := bson.M{"_id": roomID}
 	update := bson.M{
 		"$set": bson.M{
 			"last_message_at": time.Now(),
@@ -122,13 +122,13 @@ func (r *channelRepo) UpdateLastMessage(ctx context.Context, channelID primitive
 	return err
 }
 
-func (r *channelRepo) GetChannelsWithUnreadCount(ctx context.Context, userID primitive.ObjectID) ([]bson.M, error) {
+func (r *roomRepo) GetRoomsWithUnreadCount(ctx context.Context, userID primitive.ObjectID) ([]bson.M, error) {
 	pipeline := []bson.M{
 		{
 			"$lookup": bson.M{
-				"from":         "channel_members",
+				"from":         "room_members",
 				"localField":   "_id",
-				"foreignField": "channel_id",
+				"foreignField": "room_id",
 				"as":           "members",
 			},
 		},
@@ -141,13 +141,13 @@ func (r *channelRepo) GetChannelsWithUnreadCount(ctx context.Context, userID pri
 		{
 			"$lookup": bson.M{
 				"from": "unread_counts",
-				"let":  bson.M{"channel_id": "$_id"},
+				"let":  bson.M{"room_id": "$_id"},
 				"pipeline": []bson.M{
 					{
 						"$match": bson.M{
 							"$expr": bson.M{
 								"$and": []bson.M{
-									{"$eq": []interface{}{"$channel_id", "$$channel_id"}},
+									{"$eq": []interface{}{"$room_id", "$$room_id"}},
 									{"$eq": []interface{}{"$user_id", userID}},
 								},
 							},
@@ -201,50 +201,50 @@ func (r *channelRepo) GetChannelsWithUnreadCount(ctx context.Context, userID pri
 	return results, nil
 }
 
-type ChannelMemberRepository interface {
-	Create(ctx context.Context, member *models.ChannelMember) error
-	GetChannelMembers(ctx context.Context, channelID primitive.ObjectID) ([]*models.ChannelMember, error)
-	GetMember(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) (*models.ChannelMember, error)
-	AddMember(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID, role string) error
-	RemoveMember(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) error
+type RoomMemberRepository interface {
+	Create(ctx context.Context, member *models.RoomMember) error
+	GetRoomMembers(ctx context.Context, roomID primitive.ObjectID) ([]*models.RoomMember, error)
+	GetMember(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID) (*models.RoomMember, error)
+	AddMember(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID, role string) error
+	RemoveMember(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID) error
 }
 
-type channelMemberRepo struct {
+type roomMemberRepo struct {
 	collection *mongo.Collection
 }
 
-func NewChannelMemberRepository(db *DB) ChannelMemberRepository {
-	return &channelMemberRepo{
-		collection: db.Database.Collection("channel_members"),
+func NewRoomMemberRepository(db *DB) RoomMemberRepository {
+	return &roomMemberRepo{
+		collection: db.Database.Collection("room_members"),
 	}
 }
 
-func (r *channelMemberRepo) Create(ctx context.Context, member *models.ChannelMember) error {
+func (r *roomMemberRepo) Create(ctx context.Context, member *models.RoomMember) error {
 	member.ID = primitive.NewObjectID()
 	member.JoinedAt = time.Now()
 
 	_, err := r.collection.InsertOne(ctx, member)
 	if err != nil {
-		return fmt.Errorf("failed to create channel member: %w", err)
+		return fmt.Errorf("failed to create room member: %w", err)
 	}
 	return nil
 }
 
-func (r *channelMemberRepo) GetChannelMembers(ctx context.Context, channelID primitive.ObjectID) ([]*models.ChannelMember, error) {
+func (r *roomMemberRepo) GetRoomMembers(ctx context.Context, roomID primitive.ObjectID) ([]*models.RoomMember, error) {
 	filter := bson.M{
-		"channel_id": channelID,
-		"is_active":  true,
+		"room_id":   roomID,
+		"is_active": true,
 	}
 
 	cursor, err := r.collection.Find(ctx, filter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get channel members: %w", err)
+		return nil, fmt.Errorf("failed to get room members: %w", err)
 	}
 	defer cursor.Close(ctx)
 
-	var members []*models.ChannelMember
+	var members []*models.RoomMember
 	for cursor.Next(ctx) {
-		var member models.ChannelMember
+		var member models.RoomMember
 		if err := cursor.Decode(&member); err != nil {
 			return nil, fmt.Errorf("failed to decode member: %w", err)
 		}
@@ -258,11 +258,11 @@ func (r *channelMemberRepo) GetChannelMembers(ctx context.Context, channelID pri
 	return members, nil
 }
 
-func (r *channelMemberRepo) GetMember(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) (*models.ChannelMember, error) {
-	var member models.ChannelMember
+func (r *roomMemberRepo) GetMember(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID) (*models.RoomMember, error) {
+	var member models.RoomMember
 	err := r.collection.FindOne(ctx, bson.M{
-		"channel_id": channelID,
-		"user_id":    userID,
+		"room_id": roomID,
+		"user_id": userID,
 	}).Decode(&member)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -273,20 +273,20 @@ func (r *channelMemberRepo) GetMember(ctx context.Context, channelID primitive.O
 	return &member, nil
 }
 
-func (r *channelMemberRepo) AddMember(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID, role string) error {
-	member := &models.ChannelMember{
-		ChannelID: channelID,
-		UserID:    userID,
-		Role:      role,
-		JoinedAt:  time.Now(),
+func (r *roomMemberRepo) AddMember(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID, role string) error {
+	member := &models.RoomMember{
+		RoomID:   roomID,
+		UserID:   userID,
+		Role:     role,
+		JoinedAt: time.Now(),
 	}
 	return r.Create(ctx, member)
 }
 
-func (r *channelMemberRepo) RemoveMember(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) error {
+func (r *roomMemberRepo) RemoveMember(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID) error {
 	filter := bson.M{
-		"channel_id": channelID,
-		"user_id":    userID,
+		"room_id": roomID,
+		"user_id": userID,
 	}
 	update := bson.M{
 		"$set": bson.M{
@@ -300,9 +300,9 @@ func (r *channelMemberRepo) RemoveMember(ctx context.Context, channelID primitiv
 }
 
 type UnreadCountRepository interface {
-	GetUnreadCount(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) (*models.UnreadCount, error)
-	IncrementUnreadCount(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) error
-	MarkAsRead(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error
+	GetUnreadCount(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID) (*models.UnreadCount, error)
+	IncrementUnreadCount(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID) error
+	MarkAsRead(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error
 }
 
 type unreadCountRepo struct {
@@ -315,11 +315,11 @@ func NewUnreadCountRepository(db *DB) UnreadCountRepository {
 	}
 }
 
-func (r *unreadCountRepo) GetUnreadCount(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) (*models.UnreadCount, error) {
+func (r *unreadCountRepo) GetUnreadCount(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID) (*models.UnreadCount, error) {
 	var unreadCount models.UnreadCount
 	err := r.collection.FindOne(ctx, bson.M{
-		"channel_id": channelID,
-		"user_id":    userID,
+		"room_id": roomID,
+		"user_id": userID,
 	}).Decode(&unreadCount)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -330,18 +330,18 @@ func (r *unreadCountRepo) GetUnreadCount(ctx context.Context, channelID primitiv
 	return &unreadCount, nil
 }
 
-func (r *unreadCountRepo) IncrementUnreadCount(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID) error {
+func (r *unreadCountRepo) IncrementUnreadCount(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID) error {
 	filter := bson.M{
-		"channel_id": channelID,
-		"user_id":    userID,
+		"room_id": roomID,
+		"user_id": userID,
 	}
 
 	update := bson.M{
 		"$inc": bson.M{"count": 1},
 		"$set": bson.M{"updated_at": time.Now()},
 		"$setOnInsert": bson.M{
-			"channel_id": channelID,
-			"user_id":    userID,
+			"room_id": roomID,
+			"user_id": userID,
 		},
 	}
 
@@ -350,10 +350,10 @@ func (r *unreadCountRepo) IncrementUnreadCount(ctx context.Context, channelID pr
 	return err
 }
 
-func (r *unreadCountRepo) MarkAsRead(ctx context.Context, channelID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error {
+func (r *unreadCountRepo) MarkAsRead(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error {
 	filter := bson.M{
-		"channel_id": channelID,
-		"user_id":    userID,
+		"room_id": roomID,
+		"user_id": userID,
 	}
 
 	update := bson.M{
@@ -363,8 +363,8 @@ func (r *unreadCountRepo) MarkAsRead(ctx context.Context, channelID primitive.Ob
 			"updated_at":           time.Now(),
 		},
 		"$setOnInsert": bson.M{
-			"channel_id": channelID,
-			"user_id":    userID,
+			"room_id": roomID,
+			"user_id": userID,
 		},
 	}
 

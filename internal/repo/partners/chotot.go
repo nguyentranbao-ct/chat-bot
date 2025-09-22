@@ -38,7 +38,7 @@ func (v *ChototPartner) GetCapabilities() PartnerCapabilities {
 	return PartnerCapabilities{
 		CanListMessages:    true,
 		CanSendMessage:     true,
-		CanGetChannelInfo:  true,
+		CanGetRoomInfo:     true,
 		CanGetUserProducts: true,
 		SupportsRealtime:   true,
 	}
@@ -64,38 +64,38 @@ func (v *ChototPartner) GetUserInfo(ctx context.Context, userID string) (*Partne
 	return partnerUserInfo, nil
 }
 
-// GetChannelInfo retrieves channel information from Chotot chat-api
-func (v *ChototPartner) GetChannelInfo(ctx context.Context, channelID string) (*PartnerChannelInfo, error) {
-	if channelID == "" {
-		return nil, NewPartnerError(PartnerTypeChotot, "GetChannelInfo", "channel ID cannot be empty", nil)
+// GetRoomInfo retrieves room information from Chotot chat-api
+func (v *ChototPartner) GetRoomInfo(ctx context.Context, roomID string) (*PartnerRoomInfo, error) {
+	if roomID == "" {
+		return nil, NewPartnerError(PartnerTypeChotot, "GetRoomInfo", "room ID cannot be empty", nil)
 	}
 
-	channelInfo, err := v.chatClient.GetChannelInfo(ctx, channelID)
+	roomInfo, err := v.chatClient.GetRoomInfo(ctx, roomID)
 	if err != nil {
-		return nil, NewPartnerError(PartnerTypeChotot, "GetChannelInfo", "failed to get channel info", err)
+		return nil, NewPartnerError(PartnerTypeChotot, "GetRoomInfo", "failed to get room info", err)
 	}
 
-	// Convert to partner channel info format
-	partnerChannelInfo := &PartnerChannelInfo{
-		ID:           channelInfo.ID,
-		Name:         channelInfo.Name,
-		Context:      channelInfo.Context,
-		Type:         "direct", // Default for Chotot channels
-		Participants: channelInfo.Participants,
+	// Convert to partner room info format
+	partnerRoomInfo := &PartnerRoomInfo{
+		ID:           roomInfo.ID,
+		Name:         roomInfo.Name,
+		Context:      roomInfo.Context,
+		Type:         "direct", // Default for Chotot rooms
+		Participants: roomInfo.Participants,
 		PartnerType:  PartnerTypeChotot,
 		Metadata: map[string]interface{}{
-			"item_name":  channelInfo.ItemName,
-			"item_price": channelInfo.ItemPrice,
+			"item_name":  roomInfo.ItemName,
+			"item_price": roomInfo.ItemPrice,
 		},
 	}
 
-	return partnerChannelInfo, nil
+	return partnerRoomInfo, nil
 }
 
 // SendMessage sends a message through Chotot chat-api
 func (v *ChototPartner) SendMessage(ctx context.Context, params SendMessageParams) error {
-	if params.ChannelID == "" {
-		return NewPartnerError(PartnerTypeChotot, "SendMessage", "channel ID cannot be empty", nil)
+	if params.RoomID == "" {
+		return NewPartnerError(PartnerTypeChotot, "SendMessage", "room ID cannot be empty", nil)
 	}
 
 	if params.SenderID == "" {
@@ -108,9 +108,9 @@ func (v *ChototPartner) SendMessage(ctx context.Context, params SendMessageParam
 
 	// Create outgoing message
 	outgoingMsg := &models.OutgoingMessage{
-		ChannelID: params.ChannelID,
-		SenderID:  params.SenderID,
-		Message:   params.Content,
+		RoomID:   params.RoomID,
+		SenderID: params.SenderID,
+		Message:  params.Content,
 	}
 
 	// Send through chat-api
@@ -173,8 +173,8 @@ func (v *ChototPartner) HealthCheck(ctx context.Context) error {
 	healthCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// Test chat service by attempting to get a dummy channel (this will fail gracefully)
-	_, err := v.chatClient.GetChannelInfo(healthCtx, "health-check")
+	// Test chat service by attempting to get a dummy room (this will fail gracefully)
+	_, err := v.chatClient.GetRoomInfo(healthCtx, "health-check")
 	// We expect this to fail, but we want to make sure the service is reachable
 	// A timeout or connection error would indicate the service is down
 	if err != nil {

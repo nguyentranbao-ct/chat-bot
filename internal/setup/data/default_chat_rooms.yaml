@@ -1,5 +1,5 @@
 ---
-- external_channel_id: 'demo_channel_001'
+- external_room_id: 'demo_room_001'
   name: 'iPhone 13 Pro - Excellent Condition'
   item_name: 'iPhone 13 Pro 256GB'
   item_price: '18,500,000 VND'
@@ -7,7 +7,7 @@
   type: 'direct'
   owner_email: 'demo@chotot.vn'
 
-- external_channel_id: 'demo_channel_002'
+- external_room_id: 'demo_room_002'
   name: 'Honda Civic 2019 - Low Mileage'
   item_name: 'Honda Civic 2019'
   item_price: '520,000,000 VND'
@@ -15,7 +15,7 @@
   type: 'direct'
   owner_email: 'demo@chotot.vn'
 
-- external_channel_id: 'demo_channel_003'
+- external_room_id: 'demo_room_003'
   name: 'MacBook Air M2 - Like New'
   item_name: 'MacBook Air M2 13-inch'
   item_price: '25,000,000 VND'
@@ -23,7 +23,7 @@
   type: 'direct'
   owner_email: 'demo@chotot.vn'
 
-- external_channel_id: 'demo_channel_004'
+- external_room_id: 'demo_room_004'
   name: 'Gaming Setup - Complete Build'
   item_name: 'Custom Gaming PC'
   item_price: '35,000,000 VND'
@@ -31,7 +31,7 @@
   type: 'direct'
   owner_email: 'demo@chotot.vn'
 
-- external_channel_id: 'demo_channel_005'
+- external_room_id: 'demo_room_005'
   name: 'Yamaha R3 2021 - Mint Condition'
   item_name: 'Yamaha YZF-R3 2021'
   item_price: '95,000,000 VND'
@@ -39,7 +39,7 @@
   type: 'direct'
   owner_email: 'demo@chotot.vn'
 
-- external_channel_id: 'demo_channel_006'
+- external_room_id: 'demo_room_006'
   name: 'Canon EOS R5 Kit - Professional Camera'
   item_name: 'Canon EOS R5 + RF 24-70mm f/2.8'
   item_price: '65,000,000 VND'
@@ -47,7 +47,7 @@
   type: 'direct'
   owner_email: 'demo@chotot.vn'
 
-- external_channel_id: 'demo_channel_007'
+- external_room_id: 'demo_room_007'
   name: 'Apartment in District 1 - City View'
   item_name: '2BR Apartment District 1'
   item_price: '4,500,000,000 VND'
@@ -55,7 +55,7 @@
   type: 'direct'
   owner_email: 'demo@chotot.vn'
 
-- external_channel_id: 'demo_channel_008'
+- external_room_id: 'demo_room_008'
   name: 'Louis Vuitton Neverfull MM - Authentic'
   item_name: 'Louis Vuitton Neverfull MM Damier'
   item_price: '28,000,000 VND'
@@ -63,7 +63,7 @@
   type: 'direct'
   owner_email: 'demo@chotot.vn'
 
-- external_channel_id: 'demo_channel_009'
+- external_room_id: 'demo_room_009'
   name: 'Rolex Submariner - Investment Watch'
   item_name: 'Rolex Submariner Date 116610LN'
   item_price: '185,000,000 VND'
@@ -71,7 +71,7 @@
   type: 'direct'
   owner_email: 'demo@chotot.vn'
 
-- external_channel_id: 'demo_channel_010'
+- external_room_id: 'demo_room_010'
   name: 'Wedding Dress - Designer Original'
   item_name: 'Vera Wang Wedding Dress Size 6'
   item_price: '15,000,000 VND'
@@ -79,7 +79,7 @@
   type: 'direct'
   owner_email: 'demo@chotot.vn'
 
-- external_channel_id: 'demo_channel_011'
+- external_room_id: 'demo_room_011'
   name: 'Vintage Vinyl Collection - Rare Records'
   item_name: 'Vintage Vinyl Records Collection (50 albums)'
   item_price: '8,500,000 VND'
@@ -87,7 +87,7 @@
   type: 'direct'
   owner_email: 'demo@chotot.vn'
 
-- external_channel_id: 'demo_channel_012'
+- external_room_id: 'demo_room_012'
   name: 'Office Space in CBD - Prime Location'
   item_name: 'Office Space 120m² District 1'
   item_price: '45,000,000 VND/month'

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The chat-bot server is an extension of the existing chat-search service, implementing a conversational AI agent that acts as a seller in product-selling channels. It integrates with the chat-api for data retrieval and message sending, using Firebase Genkit for Go for LLM-powered conversations with tool-based AI flows.
+The chat-bot server is an extension of the existing chat-search service, implementing a conversational AI agent that acts as a seller in product-selling rooms. It integrates with the chat-api for data retrieval and message sending, using Firebase Genkit for Go for LLM-powered conversations with tool-based AI flows.
 
 The system processes messages from two primary sources: a synchronous HTTP API and an asynchronous Kafka topic. It also provides a comprehensive set of RESTful endpoints for managing users and their attributes.
 
@@ -66,7 +66,7 @@ The system supports two main data flows for message processing:
 flowchart TD
     A[Receive POST /api/v1/messages] --> B{Validate Request<br/>Headers, Metadata}
     B -->|Invalid| C[Return Error]
-    B -->|Valid| D[Gather Data<br/>Channel Info + Messages]
+    B -->|Valid| D[Gather Data<br/>Room Info + Messages]
     D --> E[Build Prompt<br/>System + Context + History]
     E --> F[Initialize Agent<br/>LLM + Tools]
     F --> G[Run Agent Loop<br/>LLM Call]
@@ -84,7 +84,7 @@ flowchart TD
 flowchart TD
     A[Consume from chat.event.messages] --> B{Validate Message<br/>Whitelist, Metadata}
     B -->|Invalid| C[Discard Message]
-    B -->|Valid| D[Gather Data<br/>Channel Info + Messages]
+    B -->|Valid| D[Gather Data<br/>Room Info + Messages]
     D --> E[Build Prompt<br/>System + Context + History]
     E --> F[Initialize Agent<br/>LLM + Tools]
     F --> G[Run Agent Loop<br/>LLM Call]
@@ -97,8 +97,8 @@ flowchart TD
 ```
 
 1. Receive new message via API or Kafka.
-2. Validate (headers, metadata.llm.mode, channel whitelist for Kafka).
-3. Gather data (channel info, message history).
+2. Validate (headers, metadata.llm.mode, room whitelist for Kafka).
+3. Gather data (room info, message history).
 4. Build prompt (system + context + history).
 5. Run Genkit AI flow (LLM + tools).
 6. Execute tools (send replies, log intents, fetch more data).

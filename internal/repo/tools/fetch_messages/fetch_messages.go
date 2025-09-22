@@ -15,7 +15,7 @@ import (
 
 const (
 	ToolName        = "FetchMessages"
-	ToolDescription = "Fetch additional conversation history from the channel"
+	ToolDescription = "Fetch additional conversation history from the room"
 )
 
 // FetchMessagesArgs defines the arguments for the FetchMessages tool
@@ -70,7 +70,7 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 	}
 
 	// Fetch messages from database
-	messages, err := t.messagesRepo.GetChannelMessages(ctx, session.GetChannelID(), fetchArgs.Limit, nil)
+	messages, err := t.messagesRepo.GetRoomMessages(ctx, session.GetRoomID(), fetchArgs.Limit, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch messages: %w", err)
 	}
@@ -80,7 +80,7 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 		log.Errorf(ctx, "Failed to log FetchMessages activity: %v", err)
 	}
 
-	log.Infof(ctx, "Fetched %d messages for channel %s", len(messages), session.GetChannelID())
+	log.Infof(ctx, "Fetched %d messages for room %s", len(messages), session.GetRoomID())
 	return messages, nil
 }
 
@@ -101,7 +101,7 @@ func (t *tool) GetGenkitTool(session toolsmanager.SessionContext, g *genkit.Genk
 			for i, msg := range messages {
 				history.Messages[i] = models.HistoryMessage{
 					ID:        msg.ID.Hex(),
-					ChannelID: msg.ChannelID,
+					RoomID:    msg.RoomID,
 					SenderID:  msg.SenderID,
 					Content:   msg.Content,
 					CreatedAt: msg.CreatedAt,
@@ -127,7 +127,7 @@ func (t *tool) parseArgs(args interface{}, target interface{}) error {
 func (t *tool) logActivity(ctx context.Context, args FetchMessagesArgs, session toolsmanager.SessionContext) error {
 	activity := &models.ChatActivity{
 		SessionID: session.GetSessionID(),
-		ChannelID: session.GetChannelID(),
+		RoomID:    session.GetRoomID(),
 		Action:    models.ActivityFetchMessages,
 		Data:      args,
 	}

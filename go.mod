@@ -6,7 +6,6 @@ require (
 	github.com/caarlos0/env/v11 v11.3.1
 	github.com/carousell/chat-api v0.0.0-20250918074315-52169473979d
 	github.com/carousell/ct-go/pkg/httpclient v0.12.0
-	github.com/carousell/ct-go/pkg/httputils v0.3.0
 	github.com/carousell/ct-go/pkg/json v0.3.3
 	github.com/carousell/ct-go/pkg/logger v0.9.8
 	github.com/carousell/ct-go/pkg/workerpool v0.2.1

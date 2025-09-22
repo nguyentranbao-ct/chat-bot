@@ -16,12 +16,12 @@ import (
 )
 
 type ChatController interface {
-	GetChannels(c echo.Context) error
-	GetChannelMembers(c echo.Context) error
+	GetRooms(c echo.Context) error
+	GetRoomMembers(c echo.Context) error
 	SendMessage(c echo.Context) error
 	SendInternalMessage(c echo.Context) error
-	GetChannelEvents(c echo.Context) error
-	GetChannelMessages(c echo.Context) error
+	GetRoomEvents(c echo.Context) error
+	GetRoomMessages(c echo.Context) error
 	MarkAsRead(c echo.Context) error
 }
 
@@ -37,27 +37,27 @@ func NewChatController(chatUsecase *usecase.ChatUseCase, socketBroadcaster useca
 	}
 }
 
-func (cc *chatController) GetChannels(c echo.Context) error {
+func (cc *chatController) GetRooms(c echo.Context) error {
 	user := c.Get("user").(*models.User)
 
 	ctx := c.Request().Context()
-	channels, err := cc.chatUsecase.GetUserChannels(ctx, user.ID)
+	rooms, err := cc.chatUsecase.GetUserRooms(ctx, user.ID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	return c.JSON(http.StatusOK, channels)
+	return c.JSON(http.StatusOK, rooms)
 }
 
-func (cc *chatController) GetChannelMembers(c echo.Context) error {
-	channelIDParam := c.Param("id")
-	channelID, err := primitive.ObjectIDFromHex(channelIDParam)
+func (cc *chatController) GetRoomMembers(c echo.Context) error {
+	roomIDParam := c.Param("id")
+	roomID, err := primitive.ObjectIDFromHex(roomIDParam)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid channel ID")
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid room ID")
 	}
 
 	ctx := c.Request().Context()
-	members, err := cc.chatUsecase.GetChannelMembers(ctx, channelID)
+	members, err := cc.chatUsecase.GetRoomMembers(ctx, roomID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -74,10 +74,10 @@ type SendMessageRequest struct {
 func (cc *chatController) SendMessage(c echo.Context) error {
 	user := c.Get("user").(*models.User)
 
-	channelIDParam := c.Param("id")
-	channelID, err := primitive.ObjectIDFromHex(channelIDParam)
+	roomIDParam := c.Param("id")
+	roomID, err := primitive.ObjectIDFromHex(roomIDParam)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid channel ID")
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid room ID")
 	}
 
 	var req SendMessageRequest
@@ -91,24 +91,24 @@ func (cc *chatController) SendMessage(c echo.Context) error {
 
 	ctx := c.Request().Context()
 	params := usecase.SendMessageParams{
-		ChannelID: channelID,
-		SenderID:  user.ID,
-		Content:   req.Content,
-		Metadata:  req.Metadata,
+		RoomID:   roomID,
+		SenderID: user.ID,
+		Content:  req.Content,
+		Metadata: req.Metadata,
 	}
 	message, err := cc.chatUsecase.SendMessage(ctx, params)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	// Broadcast message to all channel members via socket
+	// Broadcast message to all room members via socket
 	go func() {
 		ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
 		defer cancel()
 
-		members, err := cc.chatUsecase.GetChannelMembers(ctx, channelID)
+		members, err := cc.chatUsecase.GetRoomMembers(ctx, roomID)
 		if err != nil {
-			fmt.Printf("Failed to get channel members for socket broadcast: %v\n", err)
+			fmt.Printf("Failed to get room members for socket broadcast: %v\n", err)
 			return
 		}
 
@@ -129,9 +129,9 @@ func (cc *chatController) SendInternalMessage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	channelID, err := primitive.ObjectIDFromHex(req.ChannelID)
+	roomID, err := primitive.ObjectIDFromHex(req.RoomID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid channel ID")
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid room ID")
 	}
 
 	senderID, err := primitive.ObjectIDFromHex(req.SenderID)
@@ -141,7 +141,7 @@ func (cc *chatController) SendInternalMessage(c echo.Context) error {
 
 	ctx := c.Request().Context()
 	params := usecase.SendMessageParams{
-		ChannelID:   channelID,
+		RoomID:      roomID,
 		SenderID:    senderID,
 		Content:     req.Content,
 		Metadata:    map[string]interface{}{"source": "internal"},
@@ -153,14 +153,14 @@ func (cc *chatController) SendInternalMessage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	// Broadcast message to all channel members via socket
+	// Broadcast message to all room members via socket
 	go func() {
 		ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
 		defer cancel()
 
-		members, err := cc.chatUsecase.GetChannelMembers(ctx, channelID)
+		members, err := cc.chatUsecase.GetRoomMembers(ctx, roomID)
 		if err != nil {
-			fmt.Printf("Failed to get channel members for internal message broadcast: %v\n", err)
+			fmt.Printf("Failed to get room members for internal message broadcast: %v\n", err)
 			return
 		}
 
@@ -178,11 +178,11 @@ func (cc *chatController) SendInternalMessage(c echo.Context) error {
 	})
 }
 
-func (cc *chatController) GetChannelEvents(c echo.Context) error {
-	channelIDParam := c.Param("id")
-	channelID, err := primitive.ObjectIDFromHex(channelIDParam)
+func (cc *chatController) GetRoomEvents(c echo.Context) error {
+	roomIDParam := c.Param("id")
+	roomID, err := primitive.ObjectIDFromHex(roomIDParam)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid channel ID")
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid room ID")
 	}
 
 	sinceParam := c.QueryParam("since")
@@ -198,7 +198,7 @@ func (cc *chatController) GetChannelEvents(c echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	events, err := cc.chatUsecase.GetChannelEvents(ctx, channelID, sinceTime)
+	events, err := cc.chatUsecase.GetRoomEvents(ctx, roomID, sinceTime)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -206,11 +206,11 @@ func (cc *chatController) GetChannelEvents(c echo.Context) error {
 	return c.JSON(http.StatusOK, events)
 }
 
-func (cc *chatController) GetChannelMessages(c echo.Context) error {
-	channelIDParam := c.Param("id")
-	channelID, err := primitive.ObjectIDFromHex(channelIDParam)
+func (cc *chatController) GetRoomMessages(c echo.Context) error {
+	roomIDParam := c.Param("id")
+	roomID, err := primitive.ObjectIDFromHex(roomIDParam)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid channel ID")
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid room ID")
 	}
 
 	limitParam := c.QueryParam("limit")
@@ -230,7 +230,7 @@ func (cc *chatController) GetChannelMessages(c echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	messages, err := cc.chatUsecase.GetChannelMessages(ctx, channelID, limit, beforeID)
+	messages, err := cc.chatUsecase.GetRoomMessages(ctx, roomID, limit, beforeID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -245,10 +245,10 @@ type MarkAsReadRequest struct {
 func (cc *chatController) MarkAsRead(c echo.Context) error {
 	user := c.Get("user").(*models.User)
 
-	channelIDParam := c.Param("id")
-	channelID, err := primitive.ObjectIDFromHex(channelIDParam)
+	roomIDParam := c.Param("id")
+	roomID, err := primitive.ObjectIDFromHex(roomIDParam)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid channel ID")
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid room ID")
 	}
 
 	var req MarkAsReadRequest
@@ -266,7 +266,7 @@ func (cc *chatController) MarkAsRead(c echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	if err := cc.chatUsecase.MarkAsRead(ctx, channelID, user.ID, messageID); err != nil {
+	if err := cc.chatUsecase.MarkAsRead(ctx, roomID, user.ID, messageID); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 

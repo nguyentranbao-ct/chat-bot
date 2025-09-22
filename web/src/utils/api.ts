@@ -4,8 +4,8 @@ import {
   LoginResponse,
   User,
   ProfileUpdateRequest,
-  Channel,
-  ChannelMember,
+  Room,
+  RoomMember,
   ChatMessage,
   SendMessageRequest,
   MessageEvent,
@@ -41,13 +41,16 @@ class ApiClient {
           window.location.href = '/login';
         }
         return Promise.reject(error);
-      }
+      },
     );
   }
 
   // Auth endpoints
   async login(request: LoginRequest): Promise<LoginResponse> {
-    const response: AxiosResponse<LoginResponse> = await this.client.post('/auth/login', request);
+    const response: AxiosResponse<LoginResponse> = await this.client.post(
+      '/auth/login',
+      request,
+    );
     return response.data;
   }
 
@@ -61,55 +64,72 @@ class ApiClient {
   }
 
   async updateProfile(request: ProfileUpdateRequest): Promise<User> {
-    const response: AxiosResponse<User> = await this.client.put('/auth/profile', request);
+    const response: AxiosResponse<User> = await this.client.put(
+      '/auth/profile',
+      request,
+    );
     return response.data;
   }
 
   // Chat endpoints
-  async getChannels(): Promise<Channel[]> {
-    const response: AxiosResponse<Channel[]> = await this.client.get('/chat/channels');
+  async getRooms(): Promise<Room[]> {
+    const response: AxiosResponse<Room[]> = await this.client.get(
+      '/chat/rooms',
+    );
     return response.data;
   }
 
-  async getChannelMembers(channelId: string): Promise<ChannelMember[]> {
-    const response: AxiosResponse<ChannelMember[]> = await this.client.get(`/chat/channels/${channelId}/members`);
+  async getRoomMembers(roomId: string): Promise<RoomMember[]> {
+    const response: AxiosResponse<RoomMember[]> = await this.client.get(
+      `/chat/rooms/${roomId}/members`,
+    );
     return response.data;
   }
 
-  async getChannelMessages(channelId: string, limit = 50, before?: string): Promise<ChatMessage[]> {
+  async getRoomMessages(
+    roomId: string,
+    limit = 50,
+    before?: string,
+  ): Promise<ChatMessage[]> {
     const params = new URLSearchParams({
       limit: limit.toString(),
       ...(before && { before }),
     });
     const response: AxiosResponse<ChatMessage[]> = await this.client.get(
-      `/chat/channels/${channelId}/messages?${params}`
+      `/chat/rooms/${roomId}/messages?${params}`,
     );
     return response.data;
   }
 
-  async sendMessage(channelId: string, request: SendMessageRequest): Promise<ChatMessage> {
+  async sendMessage(
+    roomId: string,
+    request: SendMessageRequest,
+  ): Promise<ChatMessage> {
     const response: AxiosResponse<ChatMessage> = await this.client.post(
-      `/chat/channels/${channelId}/messages`,
-      request
+      `/chat/rooms/${roomId}/messages`,
+      request,
     );
     return response.data;
   }
 
-  async getChannelEvents(channelId: string, sinceTime: string): Promise<MessageEvent[]> {
+  async getRoomEvents(
+    roomId: string,
+    sinceTime: string,
+  ): Promise<MessageEvent[]> {
     const response: AxiosResponse<MessageEvent[]> = await this.client.get(
-      `/chat/channels/${channelId}/events?since=${sinceTime}`
+      `/chat/rooms/${roomId}/events?since=${sinceTime}`,
     );
     return response.data;
   }
 
-  async markAsRead(channelId: string, lastReadMessageId: string): Promise<void> {
-    await this.client.post(`/chat/channels/${channelId}/read`, {
+  async markAsRead(roomId: string, lastReadMessageId: string): Promise<void> {
+    await this.client.post(`/chat/rooms/${roomId}/read`, {
       message_id: lastReadMessageId,
     });
   }
 
-  async setTyping(channelId: string, isTyping: boolean): Promise<void> {
-    await this.client.post(`/chat/channels/${channelId}/typing`, {
+  async setTyping(roomId: string, isTyping: boolean): Promise<void> {
+    await this.client.post(`/chat/rooms/${roomId}/typing`, {
       is_typing: isTyping,
     });
   }

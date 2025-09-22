@@ -37,7 +37,7 @@ type SessionContext interface {
 
 	// Session identification
 	GetSessionID() primitive.ObjectID
-	GetChannelID() primitive.ObjectID
+	GetRoomID() primitive.ObjectID
 	GetBuyerID() primitive.ObjectID
 	GetMerchantID() primitive.ObjectID
 

@@ -13,14 +13,14 @@
     - It is NOT a reason to stop the conversation or end the session.
 
     CONTEXT INFORMATION:
-    - Channel: {{.Channel.Name}}
-    {{ if .Channel.Metadata.ItemName -}}
-    - Product: {{.Channel.Metadata.ItemName}} {{end}}{{if .Channel.Metadata.ItemPrice}} (Price: {{.Channel.Metadata.ItemPrice}})
+    - Room: {{.Room.Name}}
+    {{ if .Room.Metadata.ItemName -}}
+    - Product: {{.Room.Metadata.ItemName}} {{end}}{{if .Room.Metadata.ItemPrice}} (Price: {{.Room.Metadata.ItemPrice}})
     {{ end -}}
     - Available: YES
     - Condition: Still in good form
-    {{if .Channel.Context}}
-    - Channel Context: {{.Channel.Context}}
+    {{if .Room.Context}}
+    - Room Context: {{.Room.Context}}
     {{end}}
   model: googleai/gemini-2.5-flash
   tools:
@@ -43,12 +43,12 @@
     IMPORTANT: Always respond to the customer with ReplyMessage. Never leave them without a response, even after using other tools.
 
     CONTEXT INFORMATION:
-    - Channel: {{.ChannelInfo.Name}}{{if .ChannelInfo.ItemName}} - Related Product: {{.ChannelInfo.ItemName}}{{end}}
+    - Room: {{.RoomInfo.Name}}{{if .RoomInfo.ItemName}} - Related Product: {{.RoomInfo.ItemName}}{{end}}
     - Session ID: {{.SessionID}}
     - User ID: {{.UserID}}
     - Current Message: "{{.Message}}"
-    {{if .ChannelInfo.Context}}
-    - Channel Context: {{.ChannelInfo.Context}}
+    {{if .RoomInfo.Context}}
+    - Room Context: {{.RoomInfo.Context}}
     {{end}}
 
     Key guidelines:
@@ -91,12 +91,12 @@
     2. IMMEDIATELY follow with ReplyMessage to acknowledge their decision and provide any additional guidance they need
 
     CONTEXT INFORMATION:
-    - Channel: {{.ChannelInfo.Name}}{{if .ChannelInfo.ItemName}} - Product: {{.ChannelInfo.ItemName}}{{end}}{{if .ChannelInfo.ItemPrice}} (Price: {{.ChannelInfo.ItemPrice}}){{end}}
+    - Room: {{.RoomInfo.Name}}{{if .RoomInfo.ItemName}} - Product: {{.RoomInfo.ItemName}}{{end}}{{if .RoomInfo.ItemPrice}} (Price: {{.RoomInfo.ItemPrice}}){{end}}
     - Session ID: {{.SessionID}}
     - User ID: {{.UserID}}
     - Current Message: "{{.Message}}"
-    {{if .ChannelInfo.Context}}
-    - Channel Context: {{.ChannelInfo.Context}}
+    {{if .RoomInfo.Context}}
+    - Room Context: {{.RoomInfo.Context}}
     {{end}}
     Focus areas:
     - Product specifications and features

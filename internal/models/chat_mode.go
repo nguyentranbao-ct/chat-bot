@@ -23,7 +23,7 @@ type ChatMode struct {
 
 type ChatSession struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	ChannelID primitive.ObjectID `bson:"channel_id" json:"channel_id"`
+	RoomID    primitive.ObjectID `bson:"room_id" json:"room_id"`
 	ChatMode  primitive.ObjectID `bson:"chat_mode" json:"chat_mode"`
 	Status    SessionStatus      `bson:"status" json:"status"`
 	StartedAt time.Time          `bson:"started_at" json:"started_at"`
@@ -35,7 +35,7 @@ type ChatSession struct {
 type ChatActivity struct {
 	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	SessionID  primitive.ObjectID `bson:"session_id" json:"session_id"`
-	ChannelID  primitive.ObjectID `bson:"channel_id" json:"channel_id"`
+	RoomID     primitive.ObjectID `bson:"room_id" json:"room_id"`
 	MessageID  string             `bson:"message_id,omitempty" json:"message_id,omitempty"`
 	Action     ActivityAction     `bson:"action" json:"action"`
 	Data       interface{}        `bson:"data,omitempty" json:"data,omitempty"`
@@ -46,7 +46,7 @@ type ChatActivity struct {
 type PurchaseIntent struct {
 	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	SessionID  primitive.ObjectID `bson:"session_id" json:"session_id"`
-	ChannelID  primitive.ObjectID `bson:"channel_id" json:"channel_id"`
+	RoomID     primitive.ObjectID `bson:"room_id" json:"room_id"`
 	UserID     primitive.ObjectID `bson:"user_id" json:"user_id"`
 	ItemName   string             `bson:"item_name" json:"item_name"`
 	ItemPrice  string             `bson:"item_price" json:"item_price"`

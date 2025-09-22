@@ -13,7 +13,7 @@ import (
 
 type ChatSessionRepository interface {
 	Create(ctx context.Context, session *models.ChatSession) error
-	GetByChannelAndUser(ctx context.Context, channelID, userID string) (*models.ChatSession, error)
+	GetByRoomAndUser(ctx context.Context, roomID, userID string) (*models.ChatSession, error)
 	GetByID(ctx context.Context, id primitive.ObjectID) (*models.ChatSession, error)
 	Update(ctx context.Context, session *models.ChatSession) error
 	EndSession(ctx context.Context, id primitive.ObjectID) error
@@ -42,11 +42,11 @@ func (r *chatSessionRepo) Create(ctx context.Context, session *models.ChatSessio
 	return nil
 }
 
-func (r *chatSessionRepo) GetByChannelAndUser(ctx context.Context, channelID, userID string) (*models.ChatSession, error) {
+func (r *chatSessionRepo) GetByRoomAndUser(ctx context.Context, roomID, userID string) (*models.ChatSession, error) {
 	filter := bson.M{
-		"channel_id": channelID,
-		"user_id":    userID,
-		"status":     models.SessionStatusActive,
+		"room_id": roomID,
+		"user_id": userID,
+		"status":  models.SessionStatusActive,
 	}
 
 	var session models.ChatSession

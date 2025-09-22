@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Channel } from '../types';
+import { Room } from '../types';
 
 interface AIAssistantProps {
-  channel: Channel;
+  room: Room;
 }
 
 interface Suggestion {
@@ -11,7 +11,7 @@ interface Suggestion {
   content: string;
 }
 
-const AIAssistant: React.FC<AIAssistantProps> = ({ channel }) => {
+const AIAssistant: React.FC<AIAssistantProps> = ({ room }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Mock AI suggestions - in real app this would come from your AI service

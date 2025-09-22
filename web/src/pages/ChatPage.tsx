@@ -7,7 +7,7 @@ import { useSocket } from '../contexts/SocketContext';
 import { api } from '../utils/api';
 import { getStoredUser, clearAuth } from '../utils/auth';
 import {
-  Channel,
+  Room,
   ChatMessage,
   SendMessageRequest,
   User,
@@ -16,33 +16,33 @@ import {
 
 const ChatPage: React.FC = () => {
   const navigate = useNavigate();
-  const { channelId } = useParams<{ channelId?: string }>();
+  const { roomId } = useParams<{ roomId?: string }>();
   const socket = useSocket();
 
   const [user, setUser] = useState<User | null>(null);
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Define callback functions first
-  const loadChannels = useCallback(async () => {
+  const loadRooms = useCallback(async () => {
     try {
-      const channelData = await api.getChannels();
-      setChannels(channelData || []); // Ensure it's always an array
+      const roomData = await api.getRooms();
+      setRooms(roomData || []); // Ensure it's always an array
     } catch (err: any) {
-      console.error('Failed to load channels:', err);
+      console.error('Failed to load rooms:', err);
       setError('Failed to load conversations');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const loadMessages = useCallback(async (channelId: string) => {
+  const loadMessages = useCallback(async (roomId: string) => {
     try {
-      const messageData = await api.getChannelMessages(channelId);
+      const messageData = await api.getRoomMessages(roomId);
       // Sort messages by created_at to ensure proper ordering (oldest first)
       const sortedMessages = (messageData || []).sort((a, b) =>
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -56,27 +56,27 @@ const ChatPage: React.FC = () => {
   }, []);
 
   const handleSendMessage = useCallback(async (request: SendMessageRequest) => {
-    if (!selectedChannel || !user) return;
+    if (!selectedRoom || !user) return;
 
     try {
-      await api.sendMessage(selectedChannel.id, request);
+      await api.sendMessage(selectedRoom.id, request);
       // Don't add message to local state - let socket handle it to prevent duplicates
-      // Don't call loadChannels here - let socket handle updates
+      // Don't call loadRooms here - let socket handle updates
     } catch (err: any) {
       console.error('Failed to send message:', err);
       setError('Failed to send message');
     }
-  }, [selectedChannel, user]);
+  }, [selectedRoom, user]);
 
   const handleMarkAsRead = useCallback(async (messageId: string) => {
-    if (!selectedChannel) return;
+    if (!selectedRoom) return;
 
     try {
-      await api.markAsRead(selectedChannel.id, messageId);
+      await api.markAsRead(selectedRoom.id, messageId);
     } catch (err: any) {
       console.error('Failed to mark as read:', err);
     }
-  }, [selectedChannel]);
+  }, [selectedRoom]);
 
   // Initialize user and data
   useEffect(() => {
@@ -87,25 +87,25 @@ const ChatPage: React.FC = () => {
     }
 
     setUser(storedUser);
-    loadChannels();
-  }, [navigate, loadChannels]);
+    loadRooms();
+  }, [navigate, loadRooms]);
 
-  // Handle URL channel parameter
+  // Handle URL room parameter
   useEffect(() => {
-    if (channelId && channels.length > 0) {
-      const channel = channels.find(c => c.id === channelId);
-      if (channel && (!selectedChannel || selectedChannel.id !== channelId)) {
-        setSelectedChannel(channel);
+    if (roomId && rooms.length > 0) {
+      const room = rooms.find(c => c.id === roomId);
+      if (room && (!selectedRoom || selectedRoom.id !== roomId)) {
+        setSelectedRoom(room);
       }
     }
-  }, [channelId, channels, selectedChannel]);
+  }, [roomId, rooms, selectedRoom]);
 
   // Set up socket listeners - stable references to avoid re-renders
   useEffect(() => {
     const handleMessageReceived = (message: ChatMessage) => {
       setMessages((prev) => {
-        // Only add if it's for current channel and not already exists
-        if (selectedChannel?.id === message.channel_id && !prev.find(m => m.id === message.id)) {
+        // Only add if it's for current room and not already exists
+        if (selectedRoom?.id === message.room_id && !prev.find(m => m.id === message.id)) {
           const newMessages = [...prev, message];
           // Sort messages to maintain chronological order
           return newMessages.sort((a, b) =>
@@ -115,10 +115,10 @@ const ChatPage: React.FC = () => {
         return prev;
       });
 
-      // Refresh channels list to update last message
-      setChannels(prev => {
-        api.getChannels().then(channelData => {
-          if (channelData) setChannels(channelData);
+      // Refresh rooms list to update last message
+      setRooms(prev => {
+        api.getRooms().then(roomData => {
+          if (roomData) setRooms(roomData);
         }).catch(console.error);
         return prev;
       });
@@ -126,7 +126,7 @@ const ChatPage: React.FC = () => {
 
     const handleMessageSent = (message: ChatMessage) => {
       setMessages((prev) => {
-        if (selectedChannel?.id === message.channel_id && !prev.find(m => m.id === message.id)) {
+        if (selectedRoom?.id === message.room_id && !prev.find(m => m.id === message.id)) {
           const newMessages = [...prev, message];
           // Sort messages to maintain chronological order
           return newMessages.sort((a, b) =>
@@ -138,13 +138,13 @@ const ChatPage: React.FC = () => {
     };
 
     const handleTypingStart = (typing: TypingIndicator) => {
-      if (selectedChannel?.id === typing.channel_id && typing.user_id !== user?.id) {
+      if (selectedRoom?.id === typing.room_id && typing.user_id !== user?.id) {
         setIsTyping(true);
       }
     };
 
     const handleTypingStop = (typing: TypingIndicator) => {
-      if (selectedChannel?.id === typing.channel_id && typing.user_id !== user?.id) {
+      if (selectedRoom?.id === typing.room_id && typing.user_id !== user?.id) {
         setIsTyping(false);
       }
     };
@@ -163,33 +163,33 @@ const ChatPage: React.FC = () => {
         socket.offTypingStop(handleTypingStop);
       };
     }
-  }, [selectedChannel?.id, user?.id, socket.isConnected]);
+  }, [selectedRoom?.id, user?.id, socket.isConnected]);
 
-  // Join/leave channels when selection changes
+  // Join/leave rooms when selection changes
   useEffect(() => {
-    if (selectedChannel) {
+    if (selectedRoom) {
       // Only load messages, don't depend on socket connection for this
-      loadMessages(selectedChannel.id);
+      loadMessages(selectedRoom.id);
 
-      // Try to join socket channel if connected
+      // Try to join socket room if connected
       if (socket.isConnected) {
-        socket.joinChannel(selectedChannel.id);
+        socket.joinRoom(selectedRoom.id);
       }
 
       return () => {
         if (socket.isConnected) {
-          socket.leaveChannel(selectedChannel.id);
+          socket.leaveRoom(selectedRoom.id);
         }
       };
     }
-  }, [selectedChannel]);
+  }, [selectedRoom]);
 
-  const handleChannelSelect = (channel: Channel) => {
-    setSelectedChannel(channel);
+  const handleRoomSelect = (room: Room) => {
+    setSelectedRoom(room);
     setMessages([]);
     setIsTyping(false);
-    // Update URL to include channel ID
-    navigate(`/chat/${channel.id}`);
+    // Update URL to include room ID
+    navigate(`/chat/${room.id}`);
   };
 
   const handleLogout = async () => {
@@ -223,14 +223,14 @@ const ChatPage: React.FC = () => {
     <Layout>
       <div className="h-full flex">
         <ConversationList
-          channels={channels}
-          selectedChannelId={selectedChannel?.id}
-          onChannelSelect={handleChannelSelect}
+          rooms={rooms}
+          selectedRoomId={selectedRoom?.id}
+          onRoomSelect={handleRoomSelect}
         />
 
-        {selectedChannel ? (
+        {selectedRoom ? (
           <ChatWindow
-            channel={selectedChannel}
+            room={selectedRoom}
             messages={messages}
             currentUserId={user?.id || ''}
             onSendMessage={handleSendMessage}

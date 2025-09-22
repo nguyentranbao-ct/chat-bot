@@ -38,7 +38,7 @@ const App: React.FC = () => {
               }
             />
             <Route
-              path="/chat/:channelId"
+              path="/chat/:roomId"
               element={
                 <ProtectedRoute>
                   <ChatPage />

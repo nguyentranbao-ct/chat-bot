@@ -31,22 +31,22 @@ type DefaultUserAttribute struct {
 	Tags      []string `yaml:"tags"`
 }
 
-type DefaultChannel struct {
-	ExternalChannelID string `yaml:"external_channel_id"`
-	Name              string `yaml:"name"`
-	ItemName          string `yaml:"item_name"`
-	ItemPrice         string `yaml:"item_price"`
-	Context           string `yaml:"context"`
-	Type              string `yaml:"type"`
-	OwnerEmail        string `yaml:"owner_email"`
+type DefaultRoom struct {
+	ExternalRoomID string `yaml:"external_room_id"`
+	Name           string `yaml:"name"`
+	ItemName       string `yaml:"item_name"`
+	ItemPrice      string `yaml:"item_price"`
+	Context        string `yaml:"context"`
+	Type           string `yaml:"type"`
+	OwnerEmail     string `yaml:"owner_email"`
 }
 
 type DefaultMessage struct {
-	ExternalChannelID string `yaml:"external_channel_id"`
-	SenderID          string `yaml:"sender_id"`
-	Content           string `yaml:"content"`
-	MessageType       string `yaml:"message_type"`
-	IsFromBot         bool   `yaml:"is_from_bot"`
+	ExternalRoomID string `yaml:"external_room_id"`
+	SenderID       string `yaml:"sender_id"`
+	Content        string `yaml:"content"`
+	MessageType    string `yaml:"message_type"`
+	IsFromBot      bool   `yaml:"is_from_bot"`
 }
 
 func SetupUsers(userRepo mongodb.UserRepository, userAttrRepo mongodb.UserAttributeRepository) error {

@@ -153,7 +153,7 @@ For methods with >3 arguments, use struct:
 func (u *messageUsecase) ProcessMessage(
     ctx context.Context,
     message *models.IncomingMessage,
-    channelID string,
+    roomID string,
     userID string,
     timestamp time.Time,
 ) error
@@ -161,7 +161,7 @@ func (u *messageUsecase) ProcessMessage(
 // After (struct for >3 args)
 type ProcessMessageArgs struct {
     Message   *models.IncomingMessage
-    ChannelID string
+    RoomID string
     UserID    string
     Timestamp time.Time
 }

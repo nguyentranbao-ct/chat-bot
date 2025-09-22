@@ -20,7 +20,7 @@ const (
 // PartnerMessage represents a normalized message from any partner
 type PartnerMessage struct {
 	ID                string                 `json:"id"`
-	ChannelID         string                 `json:"channel_id"`
+	RoomID            string                 `json:"room_id"`
 	SenderID          string                 `json:"sender_id"`
 	Content           string                 `json:"content"`
 	MessageType       string                 `json:"message_type"`
@@ -29,9 +29,9 @@ type PartnerMessage struct {
 	PartnerMetadata   map[string]interface{} `json:"partner_metadata"`
 }
 
-// PartnerChannelInfo represents normalized channel info from any partner
-type PartnerChannelInfo struct {
-	ID           string                 `json:"id"` // external partner channel ID
+// PartnerRoomInfo represents normalized room info from any partner
+type PartnerRoomInfo struct {
+	ID           string                 `json:"id"` // external partner room ID
 	Name         string                 `json:"name"`
 	Context      string                 `json:"context"`
 	Type         string                 `json:"type"` // "direct", "group", etc.
@@ -44,23 +44,23 @@ type PartnerChannelInfo struct {
 type PartnerCapabilities struct {
 	CanListMessages    bool `json:"can_list_messages"`
 	CanSendMessage     bool `json:"can_send_message"`
-	CanGetChannelInfo  bool `json:"can_get_channel_info"`
+	CanGetRoomInfo     bool `json:"can_get_room_info"`
 	CanGetUserProducts bool `json:"can_get_user_products"`
 	SupportsRealtime   bool `json:"supports_realtime"`
 }
 
 // MessageListParams represents parameters for listing messages
 type MessageListParams struct {
-	ChannelID string `json:"channel_id"`
-	UserID    string `json:"user_id,omitempty"`
-	Limit     int    `json:"limit"`
-	BeforeTs  *int64 `json:"before_ts,omitempty"`
-	AfterTs   *int64 `json:"after_ts,omitempty"`
+	RoomID   string `json:"room_id"`
+	UserID   string `json:"user_id,omitempty"`
+	Limit    int    `json:"limit"`
+	BeforeTs *int64 `json:"before_ts,omitempty"`
+	AfterTs  *int64 `json:"after_ts,omitempty"`
 }
 
 // SendMessageParams represents parameters for sending a message
 type SendMessageParams struct {
-	ChannelID   string                 `json:"channel_id"`
+	RoomID      string                 `json:"room_id"`
 	SenderID    string                 `json:"sender_id"`
 	Content     string                 `json:"content"`
 	MessageType string                 `json:"message_type"`
@@ -96,8 +96,8 @@ type Partner interface {
 	GetPartnerType() PartnerType
 	GetCapabilities() PartnerCapabilities
 
-	// Channel operations
-	GetChannelInfo(ctx context.Context, channelID string) (*PartnerChannelInfo, error)
+	// Room operations
+	GetRoomInfo(ctx context.Context, roomID string) (*PartnerRoomInfo, error)
 
 	// User operations
 	GetUserInfo(ctx context.Context, userID string) (*PartnerUserInfo, error)

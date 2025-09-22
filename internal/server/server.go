@@ -81,12 +81,12 @@ func StartServer(
 
 	// Chat routes
 	chatGroup := api.Group("/chat", authMiddleware)
-	chatGroup.GET("/channels", chatController.GetChannels)
-	chatGroup.GET("/channels/:id/members", chatController.GetChannelMembers)
-	chatGroup.POST("/channels/:id/messages", chatController.SendMessage)
-	chatGroup.GET("/channels/:id/messages", chatController.GetChannelMessages)
-	chatGroup.GET("/channels/:id/events", chatController.GetChannelEvents)
-	chatGroup.POST("/channels/:id/read", chatController.MarkAsRead)
+	chatGroup.GET("/rooms", chatController.GetRooms)
+	chatGroup.GET("/rooms/:id/members", chatController.GetRoomMembers)
+	chatGroup.POST("/rooms/:id/messages", chatController.SendMessage)
+	chatGroup.GET("/rooms/:id/messages", chatController.GetRoomMessages)
+	chatGroup.GET("/rooms/:id/events", chatController.GetRoomEvents)
+	chatGroup.POST("/rooms/:id/read", chatController.MarkAsRead)
 
 	// User management routes (keeping for backward compatibility)
 	api.POST("/users", handler.CreateUser)
