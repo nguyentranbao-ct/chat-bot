@@ -79,7 +79,7 @@ func (uc *llmUsecaseV2) TriggerLLM(ctx context.Context, message *models.ChatMess
 		return fmt.Errorf("failed to find merchant and buyer: %w", err)
 	}
 
-	recentMessages, err := uc.fetchRecentMessages(ctx, channel.ID, 20)
+	recentMessages, err := uc.fetchRecentMessages(ctx, channel.ID, 5)
 	if err != nil {
 		log.Warnf(ctx, "Failed to fetch recent messages: %v", err)
 		recentMessages = &models.MessageHistory{Messages: []models.HistoryMessage{}}
