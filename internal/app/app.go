@@ -21,7 +21,9 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/vendors"
 	"github.com/nguyentranbao-ct/chat-bot/internal/server"
+	"github.com/nguyentranbao-ct/chat-bot/internal/setup"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/util"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap/zapcore"
@@ -72,7 +74,6 @@ func Invoke(funcs ...any) *fx.App {
 			mongodb.NewMessageEventRepository,
 			mongodb.NewUnreadCountRepository,
 			mongodb.NewMessageDedupRepository,
-			mongodb.NewMigrationRepository,
 
 			// repo clients
 			chatapi.NewChatAPIClient,
@@ -96,10 +97,11 @@ func Invoke(funcs ...any) *fx.App {
 			list_products.NewTool,
 		),
 		fx.Supply(conf),
-		fx.Invoke(initializeUsers),
-		fx.Invoke(runDatabaseMigrations),
-		fx.Invoke(initializeChannels),
+		fx.Invoke(setup.SetupUsers),
+		fx.Invoke(setup.SetupChannels),
+		fx.Invoke(setup.SetupChatModes),
 		fx.Invoke(initializeProductServices),
+		fx.Invoke(initializeLLMTools),
 		fx.Invoke(initializeVendors),
 		fx.Invoke(funcs...),
 	)
@@ -137,54 +139,22 @@ func initializeProductServices(
 	})
 }
 
-// initializeUsers initializes default users and attributes on startup
-func initializeUsers(
-	lc fx.Lifecycle,
-	userRepo mongodb.UserRepository,
-	userAttrRepo mongodb.UserAttributeRepository,
+func initializeLLMTools(
+	toolsManager toolsmanager.ToolsManager,
+	endSessionTool end_session.Tool,
+	fetchMessagesTool fetch_messages.Tool,
+	replyMessageTool reply_message.Tool,
+	purchaseIntentTool purchase_intent.Tool,
+	listProductsTool list_products.Tool,
 ) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			return usecase.AutoMigrateUsers(userRepo, userAttrRepo)
-		},
-	})
-}
-
-// initializeChannels initializes default channels and messages on startup
-func initializeChannels(
-	lc fx.Lifecycle,
-	userRepo mongodb.UserRepository,
-	channelRepo mongodb.ChannelRepository,
-	channelMemberRepo mongodb.ChannelMemberRepository,
-	messageRepo mongodb.ChatMessageRepository,
-) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			return usecase.AutoMigrateChannels(userRepo, channelRepo, channelMemberRepo, messageRepo)
-		},
-	})
-}
-
-// runDatabaseMigrations runs necessary database migrations on startup
-func runDatabaseMigrations(
-	lc fx.Lifecycle,
-	migrationRepo mongodb.MigrationRepository,
-) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			// Run channel migration to vendor model first
-			if err := migrationRepo.MigrateChannelsToVendorModel(ctx); err != nil {
-				return fmt.Errorf("failed to migrate channels to vendor model: %w", err)
-			}
-
-			// Run message migration to remove external_channel_id
-			if err := migrationRepo.MigrateChatMessagesToRemoveExternalChannelID(ctx); err != nil {
-				return fmt.Errorf("failed to migrate chat messages: %w", err)
-			}
-
-			return nil
-		},
-	})
+	util.PanicOnError(
+		"register tools",
+		toolsManager.AddTool(endSessionTool),
+		toolsManager.AddTool(fetchMessagesTool),
+		toolsManager.AddTool(replyMessageTool),
+		toolsManager.AddTool(purchaseIntentTool),
+		toolsManager.AddTool(listProductsTool),
+	)
 }
 
 // initializeVendors registers all vendor implementations with the registry

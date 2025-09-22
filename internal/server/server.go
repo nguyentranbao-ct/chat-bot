@@ -43,7 +43,6 @@ func StartServer(
 		},
 	}
 
-	pkgmdw.AutoVersioning(e)
 	e.Use(pkgmdw.Metrics())
 	e.Use(pkgmdw.RequestID())
 	e.Use(pkgmdw.LogRequest(logConfig))

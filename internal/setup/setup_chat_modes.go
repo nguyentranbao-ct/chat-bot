@@ -1,4 +1,4 @@
-package usecase
+package setup
 
 import (
 	"context"
@@ -12,10 +12,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed default_chat_modes.yaml
+//go:embed data/default_chat_modes.yaml
 var defaultChatModesData []byte
 
-func AutoMigrate(repo mongodb.ChatModeRepository) error {
+func SetupChatModes(repo mongodb.ChatModeRepository) error {
 	var defaultModes []models.ChatMode
 	if err := yaml.Unmarshal(defaultChatModesData, &defaultModes); err != nil {
 		return fmt.Errorf("failed to unmarshal default chat modes: %w", err)

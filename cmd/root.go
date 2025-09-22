@@ -5,7 +5,6 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/app"
 	"github.com/nguyentranbao-ct/chat-bot/internal/kafka"
 	"github.com/nguyentranbao-ct/chat-bot/internal/server"
-	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +14,6 @@ var rootCmd = &cobra.Command{
 	SilenceErrors: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		app.Invoke(
-			usecase.AutoMigrate,
 			server.StartServer,
 			kafka.StartConsumeMessages,
 		).Run()

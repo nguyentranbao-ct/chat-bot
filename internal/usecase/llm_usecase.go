@@ -14,13 +14,7 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/end_session"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/fetch_messages"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/list_products"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/purchase_intent"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/reply_message"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
-	"github.com/nguyentranbao-ct/chat-bot/pkg/util"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -41,21 +35,7 @@ func NewLLMUsecase(
 	cfg *config.Config,
 	toolsManager toolsmanager.ToolsManager,
 	sessionRepo mongodb.ChatSessionRepository,
-	endSessionTool end_session.Tool,
-	fetchMessagesTool fetch_messages.Tool,
-	replyMessageTool reply_message.Tool,
-	purchaseIntentTool purchase_intent.Tool,
-	listProductsTool list_products.Tool,
 ) (LLMUsecase, error) {
-	util.PanicOnError(
-		"register tools",
-		toolsManager.AddTool(endSessionTool),
-		toolsManager.AddTool(fetchMessagesTool),
-		toolsManager.AddTool(replyMessageTool),
-		toolsManager.AddTool(purchaseIntentTool),
-		toolsManager.AddTool(listProductsTool),
-	)
-
 	return &llmUsecase{
 		toolsManager: toolsManager,
 		sessionRepo:  sessionRepo,
