@@ -10,15 +10,14 @@ import (
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/internal_api"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
 	ToolName        = "ReplyMessage"
-	ToolDescription = "Send a message to the chat channel via chat-api"
+	ToolDescription = "Send a reply message to the user in the current chat channel. ALWAYS use this tool at least once to respond to the user's message. You can call this tool multiple times but do not repeating the same message."
 )
 
 // ReplyMessageArgs defines the arguments for the ReplyMessage tool
@@ -32,19 +31,19 @@ type Tool interface {
 
 // Tool implements the toolsmanager.Tool interface
 type tool struct {
-	chatAPIClient chatapi.Client
-	activityRepo  mongodb.ChatActivityRepository
+	internalAPIClient internal_api.Client
+	activityRepo      mongodb.ChatActivityRepository
 }
 
 // NewTool creates a new ReplyMessage tool instance
 func NewTool(
-	chatAPIClient chatapi.Client,
+	internalAPIClient internal_api.Client,
 	activityRepo mongodb.ChatActivityRepository,
 	toolsManager toolsmanager.ToolsManager,
 ) Tool {
 	t := &tool{
-		chatAPIClient: chatAPIClient,
-		activityRepo:  activityRepo,
+		internalAPIClient: internalAPIClient,
+		activityRepo:      activityRepo,
 	}
 	toolsManager.AddTool(t)
 	return t
@@ -68,14 +67,14 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 		return nil, fmt.Errorf("failed to parse arguments: %w", err)
 	}
 
-	// Send the message
-	outgoingMessage := &models.OutgoingMessage{
-		ChannelID: session.GetChannelID(),
-		SenderID:  session.GetSenderID(),
-		Message:   replyArgs.Message,
+	// Send the message via internal API
+	req := internal_api.SendMessageRequest{
+		ChannelID: session.GetChannelID().Hex(),
+		SenderID:  session.GetMerchantID().Hex(),
+		Content:   replyArgs.Message,
 	}
 
-	if err := t.chatAPIClient.SendMessage(ctx, outgoingMessage); err != nil {
+	if err := t.internalAPIClient.SendMessage(ctx, req); err != nil {
 		return nil, fmt.Errorf("failed to send message: %w", err)
 	}
 
@@ -121,13 +120,8 @@ func (t *tool) parseArgs(args interface{}, target interface{}) error {
 
 // logActivity logs the tool execution activity
 func (t *tool) logActivity(ctx context.Context, args ReplyMessageArgs, session toolsmanager.SessionContext) error {
-	sessionID, err := primitive.ObjectIDFromHex(session.GetSessionID())
-	if err != nil {
-		return fmt.Errorf("invalid session ID: %w", err)
-	}
-
 	activity := &models.ChatActivity{
-		SessionID: sessionID,
+		SessionID: session.GetSessionID(),
 		ChannelID: session.GetChannelID(),
 		Action:    models.ActivityReplyMessage,
 		Data:      args,

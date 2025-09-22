@@ -18,7 +18,6 @@ func StartConsumeMessages(
 	sd fx.Shutdowner,
 	lc fx.Lifecycle,
 	conf *config.Config,
-	messageUsecase usecase.MessageUsecase,
 	chatUsecase *usecase.ChatUseCase,
 ) error {
 	if !conf.Kafka.Enabled {

@@ -11,12 +11,12 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
 	ToolName        = "ListProducts"
-	ToolDescription = "Retrieve and display the seller's product listings when buyers ask about available items, inventory, what's for sale, or want to browse products. Use this when customers inquire about merchandise, catalog, or what the seller has in stock. Fetches products from linked external service accounts like Chotot with details including name, price, category, and images."
+	ToolDescription = `Retrieve and display the seller's product listings when buyers ask about more available items, inventory, what's for sale, or want to browse products. Use this when customers inquire about merchandise, catalog, or what the seller has in stock. Fetches products from linked external service accounts like Chotot with details including name, price, category, and images.
+Be aware that the seller may not have any products listed. In that case, respond with a message indicating no products are available.`
 )
 
 // ListProductsInput defines the input arguments for the ListProducts tool
@@ -69,7 +69,7 @@ func (t *tool) Description() string {
 }
 
 // Execute runs the tool with the given arguments and session context
-func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanager.SessionContext) (interface{}, error) {
+func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanager.SessionContext) (*ListProductsOutput, error) {
 	// Parse arguments
 	var input ListProductsInput
 	if err := t.parseArgs(args, &input); err != nil {
@@ -78,51 +78,23 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 
 	// Set defaults
 	if input.Limit <= 0 {
-		input.Limit = 9
+		input.Limit = 20
 	}
 	if input.Page <= 0 {
 		input.Page = 1
 	}
 
 	// Get seller ID from session context (this is the chotot_id)
-	sellerID := session.GetSenderID()
-	if sellerID == "" {
-		return nil, fmt.Errorf("no seller ID found in session context")
-	}
-
-	// Step 1: Map from chotot_id (seller ID) to internal user ID
-	// Find user attribute with key="chotot_id" and value=sellerID
-	chototIDAttrs, err := t.userAttributeRepo.GetByKey(ctx, "chotot_id")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get chotot_id attributes: %w", err)
-	}
-
-	var internalUserID primitive.ObjectID
-	var found bool
-	for _, attr := range chototIDAttrs {
-		if attr.Value == sellerID {
-			internalUserID = attr.UserID
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		log.Infow(ctx, "No internal user found for chotot_id", "chotot_id", sellerID)
-		return &ListProductsOutput{
-			Products: []Product{},
-			Total:    0,
-		}, nil
-	}
+	sellerID := session.GetMerchantID()
 
 	// Step 2: Get the chotot_oid attribute for this internal user
-	chototOIDAttr, err := t.userAttributeRepo.GetByUserIDAndKey(ctx, internalUserID, "chotot_oid")
+	chototOIDAttr, err := t.userAttributeRepo.GetByUserIDAndKey(ctx, sellerID, "chotot_oid")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chotot_oid attribute: %w", err)
 	}
 
 	if chototOIDAttr == nil {
-		log.Infow(ctx, "No chotot_oid found for internal user", "internal_user_id", internalUserID.Hex())
+		log.Infow(ctx, "No chotot_oid found for internal user", "internal_user_id", sellerID.Hex())
 		return &ListProductsOutput{
 			Products: []Product{},
 			Total:    0,
@@ -153,7 +125,7 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 
 	log.Infow(ctx, "Successfully fetched products from Chotot",
 		"chotot_id", sellerID,
-		"internal_user_id", internalUserID.Hex(),
+		"internal_user_id", sellerID.Hex(),
 		"chotot_oid", chototOIDAttr.Value,
 		"products_count", len(products),
 		"products", products,
@@ -170,10 +142,14 @@ func (t *tool) GetGenkitTool(session toolsmanager.SessionContext, g *genkit.Genk
 			if err != nil {
 				return nil, err
 			}
-
-			if output, ok := result.(*ListProductsOutput); ok {
-				return output, nil
+			if len(result.Products) == 0 {
+				// Return a message indicating no products found
+				return &ListProductsOutput{
+					Products: []Product{},
+					Total:    0,
+				}, nil
 			}
+
 			return nil, fmt.Errorf("unexpected result type: %T", result)
 		})
 }
@@ -192,13 +168,8 @@ func (t *tool) parseArgs(args interface{}, target interface{}) error {
 
 // logActivity logs the tool execution activity
 func (t *tool) logActivity(ctx context.Context, input ListProductsInput, session toolsmanager.SessionContext) error {
-	sessionID, err := primitive.ObjectIDFromHex(session.GetSessionID())
-	if err != nil {
-		return fmt.Errorf("invalid session ID: %w", err)
-	}
-
 	activity := &models.ChatActivity{
-		SessionID: sessionID,
+		SessionID: session.GetSessionID(),
 		ChannelID: session.GetChannelID(),
 		Action:    models.ActivityListProducts,
 		Data:      input,

@@ -22,9 +22,6 @@ var defaultUserAttributesData []byte
 //go:embed default_channels.yaml
 var defaultChannelsData []byte
 
-//go:embed default_messages.yaml
-var defaultMessagesData []byte
-
 type DefaultUser struct {
 	Name  string `yaml:"name"`
 	Email string `yaml:"email"`
@@ -186,7 +183,6 @@ func AutoMigrateChannels(userRepo mongodb.UserRepository, channelRepo mongodb.Ch
 				},
 				Name:       defaultChannel.Name,
 				Context:    defaultChannel.Context,
-				Type:       defaultChannel.Type,
 				Metadata:   metadata,
 				CreatedAt:  now,
 				UpdatedAt:  now,
@@ -215,80 +211,5 @@ func AutoMigrateChannels(userRepo mongodb.UserRepository, channelRepo mongodb.Ch
 			log.Debugw(ctx, "Channel already exists", "vendor_channel_id", defaultChannel.ExternalChannelID)
 		}
 	}
-
-	// Load and create default messages
-	var defaultMessages []DefaultMessage
-	if err := yaml.Unmarshal(defaultMessagesData, &defaultMessages); err != nil {
-		return fmt.Errorf("failed to unmarshal default messages: %w", err)
-	}
-
-	log.Debugw(ctx, "Loaded messages from YAML", "count", len(defaultMessages))
-
-	// Create messages if they don't exist
-	for _, defaultMessage := range defaultMessages {
-		user, err := userRepo.GetByEmail(ctx, defaultMessage.SenderID)
-		if err != nil || user == nil {
-			log.Warnw(ctx, "Sender user not found for message", "sender_id", defaultMessage.SenderID)
-			continue
-		}
-
-		// Find channel by vendor channel ID (consistent with channel creation)
-		channel, err := channelRepo.GetByVendorChannelID(ctx, "chotot", defaultMessage.ExternalChannelID)
-		if err != nil || channel == nil {
-			log.Warnw(ctx, "Channel not found for message", "vendor_channel_id", defaultMessage.ExternalChannelID)
-			continue
-		}
-
-		// Check if we already have a message with the same content and sender to avoid exact duplicates
-		existingMessages, err := messageRepo.GetChannelMessages(ctx, channel.ID, 100, nil) // Check more messages to detect duplicates
-		if err == nil {
-			isDuplicate := false
-			for _, existingMsg := range existingMessages {
-				user, err := userRepo.GetByEmail(ctx, defaultMessage.SenderID)
-				if err != nil || user == nil {
-					log.Warnw(ctx, "Sender user not found for message", "sender_id", defaultMessage.SenderID)
-					break
-				}
-
-				if existingMsg.SenderID == user.ID &&
-					existingMsg.Content == defaultMessage.Content &&
-					existingMsg.Metadata.Source == "demo_data" {
-					isDuplicate = true
-					break
-				}
-			}
-			if isDuplicate {
-				log.Debugw(ctx, "Message already exists for channel", "vendor_channel_id", defaultMessage.ExternalChannelID, "sender_id", defaultMessage.SenderID)
-				continue
-			}
-		}
-
-		now := time.Now()
-		message := &models.ChatMessage{
-			ChannelID:      channel.ID,
-			SenderID:       user.ID,
-			Content:        defaultMessage.Content,
-			CreatedAt:      now,
-			UpdatedAt:      now,
-			IsEdited:       false,
-			IsDeleted:      false,
-			DeliveryStatus: "delivered",
-			Metadata: models.MessageMetadata{
-				Source:    "demo_data",
-				IsFromBot: defaultMessage.IsFromBot,
-			},
-		}
-
-		if err := messageRepo.Create(ctx, message); err != nil {
-			return fmt.Errorf("failed to create message for channel '%s': %w", defaultMessage.ExternalChannelID, err)
-		}
-		log.Infow(ctx, "Created default message", "vendor_channel_id", defaultMessage.ExternalChannelID, "sender_id", defaultMessage.SenderID)
-
-		// Update channel's last message time
-		if err := channelRepo.UpdateLastMessage(ctx, channel.ID); err != nil {
-			log.Warnw(ctx, "Failed to update channel last message time", "channel_id", channel.ID, "error", err)
-		}
-	}
-
 	return nil
 }

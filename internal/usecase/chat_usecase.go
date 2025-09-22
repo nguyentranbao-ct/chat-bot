@@ -24,6 +24,7 @@ type ChatUseCase struct {
 	userAttributeRepo mongodb.UserAttributeRepository
 	vendorRegistry    *vendors.VendorRegistry
 	socketHandler     SocketBroadcaster
+	llmUsecaseV2      LLMUsecaseV2
 }
 
 type SocketBroadcaster interface {
@@ -44,6 +45,7 @@ func NewChatUseCase(
 	userAttributeRepo mongodb.UserAttributeRepository,
 	vendorRegistry *vendors.VendorRegistry,
 	socketHandler SocketBroadcaster,
+	llmUsecaseV2 LLMUsecaseV2,
 ) *ChatUseCase {
 	return &ChatUseCase{
 		channelRepo:       channelRepo,
@@ -55,6 +57,7 @@ func NewChatUseCase(
 		userAttributeRepo: userAttributeRepo,
 		vendorRegistry:    vendorRegistry,
 		socketHandler:     socketHandler,
+		llmUsecaseV2:      llmUsecaseV2,
 	}
 }
 
@@ -130,14 +133,14 @@ func (uc *ChatUseCase) postProcessSentMessage(ctx context.Context, message *mode
 	ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
 	defer cancel()
 
-	// Send to external vendor asynchronously
-	uc.sendToExternalVendor(ctx, message, channel, params)
-
 	// Increment unread count for other members
 	uc.incrementUnreadCountForOthers(ctx, params.ChannelID, params.SenderID)
 
 	// Create message event for real-time sync
 	uc.createMessageSentEvent(ctx, message, params)
+
+	// Send to external vendor asynchronously
+	uc.sendToExternalVendor(ctx, message, channel, params)
 }
 
 // sendToExternalVendor sends the message to the external vendor
@@ -285,6 +288,8 @@ func (uc *ChatUseCase) postProcessIncomingMessage(ctx context.Context, message *
 
 	// Broadcast to socket connections
 	uc.broadcastIncomingMessage(ctx, message, channel.ID)
+
+	uc.llmUsecaseV2.TriggerLLM(ctx, message, channel)
 }
 
 // createMessageReceivedEvent creates a real-time event for the received message
@@ -366,7 +371,6 @@ func (uc *ChatUseCase) findOrCreateChannel(ctx context.Context, channelID string
 		},
 		Name:          vendorChannelInfo.Name,
 		Context:       vendorChannelInfo.Context,
-		Type:          vendorChannelInfo.Type,
 		LastMessageAt: &ts,
 		Metadata:      metadata,
 		CreatedAt:     time.Now(),

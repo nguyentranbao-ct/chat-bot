@@ -82,12 +82,12 @@ type UserProductsResult struct {
 
 // VendorUserInfo represents normalized user info from any vendor
 type VendorUserInfo struct {
-	ID           string                 `json:"id"` // external vendor user ID
-	Name         string                 `json:"name"`
-	Email        string                 `json:"email"`
-	VendorType   VendorType             `json:"vendor_type"`
-	Metadata     map[string]interface{} `json:"metadata"`
-	IsActive     bool                   `json:"is_active"`
+	ID         string                 `json:"id"` // external vendor user ID
+	Name       string                 `json:"name"`
+	Email      string                 `json:"email"`
+	VendorType VendorType             `json:"vendor_type"`
+	Metadata   map[string]interface{} `json:"metadata"`
+	IsActive   bool                   `json:"is_active"`
 }
 
 // Vendor interface defines the operations that all vendors must support
@@ -103,7 +103,6 @@ type Vendor interface {
 	GetUserInfo(ctx context.Context, userID string) (*VendorUserInfo, error)
 
 	// Message operations
-	ListMessages(ctx context.Context, params MessageListParams) ([]VendorMessage, error)
 	SendMessage(ctx context.Context, params SendMessageParams) error
 
 	// Product operations

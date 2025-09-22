@@ -11,7 +11,6 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
@@ -110,13 +109,8 @@ func (t *tool) parseArgs(args interface{}, target interface{}) error {
 
 // logActivity logs the tool execution activity
 func (t *tool) logActivity(ctx context.Context, args EndSessionArgs, session toolsmanager.SessionContext) error {
-	sessionID, err := primitive.ObjectIDFromHex(session.GetSessionID())
-	if err != nil {
-		return fmt.Errorf("invalid session ID: %w", err)
-	}
-
 	activity := &models.ChatActivity{
-		SessionID: sessionID,
+		SessionID: session.GetSessionID(),
 		ChannelID: session.GetChannelID(),
 		Action:    models.ActivityEndSession,
 		Data:      args,

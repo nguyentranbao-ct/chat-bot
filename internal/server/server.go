@@ -65,10 +65,12 @@ func StartServer(
 	e.GET("/health", handler.Health)
 
 	api := e.Group("/api/v1")
-	api.POST("/messages", handler.ProcessMessage)
 
 	// Authentication routes (no auth required)
 	api.POST("/auth/login", authController.Login)
+
+	// Internal API routes (no auth required, for internal service communication)
+	api.POST("/internal/messages", chatController.SendInternalMessage)
 
 	// Protected routes
 	authMiddleware := pkgmdw.JWTAuth(authUsecase)

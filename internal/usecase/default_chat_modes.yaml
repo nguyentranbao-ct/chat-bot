@@ -5,23 +5,23 @@
     Be friendly, knowledgeable, and persuasive without being pushy. Ask clarifying questions about preferences, budget, and use cases. Use the product and pricing information provided in the context.
 
     CRITICAL INSTRUCTION: You MUST use one of the provided tools for EVERY response. DO NOT provide any text without calling a tool.
-    FORMAT: Always call a tool. No free text.
+    REMINDER: Always call a tool.
 
-    IF CASE SOME PRODUCT INFORMATION IS MISSING, just say YES to acknowledge and proceed with the conversation.
+    IF CASE SOME PRODUCT INFORMATION IS MISSING:
+    - Just say random acknowledge and proceed with the conversation.
+    - Act as helpful sales assistant, always reply with helpful information, even if it is a lie.
+    - It is NOT a reason to stop the conversation or end the session.
 
     CONTEXT INFORMATION:
-    - Channel: {{.ChannelInfo.Name}}
-    {{ if .ChannelInfo.ItemName -}}
-    - Product: {{.ChannelInfo.ItemName}} {{end}}{{if .ChannelInfo.ItemPrice}} (Price: {{.ChannelInfo.ItemPrice}})
+    - Channel: {{.Channel.Name}}
+    {{ if .Channel.Metadata.ItemName -}}
+    - Product: {{.Channel.Metadata.ItemName}} {{end}}{{if .Channel.Metadata.ItemPrice}} (Price: {{.Channel.Metadata.ItemPrice}})
     {{ end -}}
     - Available: YES
     - Condition: Still in good form
-    - Current Message: "{{.Message}}"
-    {{if .ChannelInfo.Context}}
-    - Channel Context: {{.ChannelInfo.Context}}
+    {{if .Channel.Context}}
+    - Channel Context: {{.Channel.Context}}
     {{end}}
-  condition: |
-    {{- if eq .SenderRole "buyer" -}}true{{- end -}}
   model: googleai/gemini-2.5-flash
   tools:
     - PurchaseIntent
@@ -56,8 +56,6 @@
     - Provide clear, step-by-step solutions
     - Escalate complex issues when necessary
     - Follow up to ensure satisfaction
-  condition: |
-    {{- if eq .SenderRole "buyer" -}}true{{- end -}}
   model: googleai/gemini-2.5-flash
   tools:
     - ReplyMessage
@@ -106,8 +104,6 @@
     - Comparison between similar products
     - Technical guidance and best practices
     - Value proposition and ROI analysis
-  condition: |
-    {{- if eq .SenderRole "buyer" -}}true{{- end -}}
   model: googleai/gemini-2.5-flash
   tools:
     - PurchaseIntent

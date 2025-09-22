@@ -53,7 +53,7 @@ func (r *chatSessionRepo) GetByChannelAndUser(ctx context.Context, channelID, us
 	err := r.collection.FindOne(ctx, filter).Decode(&session)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, nil
+			return nil, models.ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get chat session: %w", err)
 	}

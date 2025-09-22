@@ -4,13 +4,11 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Controller interface {
-	ProcessMessage(c echo.Context) error
 	Health(c echo.Context) error
 
 	// User management endpoints
@@ -27,40 +25,13 @@ type Controller interface {
 }
 
 type controller struct {
-	messageUsecase usecase.MessageUsecase
-	userUsecase    usecase.UserUsecase
+	userUsecase usecase.UserUsecase
 }
 
-func NewHandler(messageUsecase usecase.MessageUsecase, userUsecase usecase.UserUsecase) Controller {
+func NewHandler(userUsecase usecase.UserUsecase) Controller {
 	return &controller{
-		messageUsecase: messageUsecase,
-		userUsecase:    userUsecase,
+		userUsecase: userUsecase,
 	}
-}
-
-func (h *controller) ProcessMessage(c echo.Context) error {
-	var message models.IncomingMessage
-	if err := c.Bind(&message); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
-	}
-
-	if err := c.Validate(message); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-
-	if message.Metadata.LLM.ChatMode == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing chat_mode in metadata.llm")
-	}
-
-	ctx := c.Request().Context()
-	if err := h.messageUsecase.ProcessMessage(ctx, message); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-
-	return c.JSON(http.StatusOK, map[string]string{
-		"status":  "success",
-		"message": "message processed successfully",
-	})
 }
 
 func (h *controller) Health(c echo.Context) error {

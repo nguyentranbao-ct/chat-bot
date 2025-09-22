@@ -92,7 +92,7 @@ func (r *userAttributeRepo) GetByUserIDAndKey(ctx context.Context, userID primit
 	}).Decode(&attr)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, nil
+			return nil, models.ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get user attribute: %w", err)
 	}

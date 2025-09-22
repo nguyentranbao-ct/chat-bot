@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	log "github.com/carousell/ct-go/pkg/logger/log_context"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/internal_api"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/util"
 )
 
 const (
@@ -44,20 +45,20 @@ type Tool interface {
 
 // Tool implements the toolsmanager.Tool interface
 type tool struct {
-	chatAPIClient      chatapi.Client
+	internalAPIClient  internal_api.Client
 	activityRepo       mongodb.ChatActivityRepository
 	purchaseIntentRepo mongodb.PurchaseIntentRepository
 }
 
 // NewTool creates a new PurchaseIntent tool instance
 func NewTool(
-	chatAPIClient chatapi.Client,
+	internalAPIClient internal_api.Client,
 	activityRepo mongodb.ChatActivityRepository,
 	purchaseIntentRepo mongodb.PurchaseIntentRepository,
 	toolsManager toolsmanager.ToolsManager,
 ) Tool {
 	t := &tool{
-		chatAPIClient:      chatAPIClient,
+		internalAPIClient:  internalAPIClient,
 		activityRepo:       activityRepo,
 		purchaseIntentRepo: purchaseIntentRepo,
 	}
@@ -76,24 +77,20 @@ func (t *tool) Description() string {
 }
 
 // Execute runs the tool with the given arguments and session context
-func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanager.SessionContext) (interface{}, error) {
+func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanager.SessionContext) (string, error) {
 	// Parse arguments
 	var purchaseIntentArgs PurchaseIntentArgs
 	if err := t.parseArgs(args, &purchaseIntentArgs); err != nil {
-		return nil, fmt.Errorf("failed to parse arguments: %w", err)
+		return "", fmt.Errorf("failed to parse arguments: %w", err)
 	}
 
 	// Convert session ID back to ObjectID for database operations
-	sessionID, err := primitive.ObjectIDFromHex(session.GetSessionID())
-	if err != nil {
-		return nil, fmt.Errorf("invalid session ID: %w", err)
-	}
 
 	// Create purchase intent
 	intent := &models.PurchaseIntent{
-		SessionID:  sessionID,
+		SessionID:  session.GetSessionID(),
 		ChannelID:  session.GetChannelID(),
-		UserID:     session.GetUserID(),
+		UserID:     session.GetBuyerID(),
 		ItemName:   purchaseIntentArgs.ItemName,
 		ItemPrice:  purchaseIntentArgs.ItemPrice,
 		Intent:     purchaseIntentArgs.Intent,
@@ -101,7 +98,7 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 	}
 
 	if err := t.purchaseIntentRepo.Create(ctx, intent); err != nil {
-		return nil, fmt.Errorf("failed to create purchase intent: %w", err)
+		return "", fmt.Errorf("failed to create purchase intent: %w", err)
 	}
 
 	// Send message if provided
@@ -114,11 +111,11 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 	}
 
 	// Log activity
-	if err := t.logActivity(ctx, purchaseIntentArgs, sessionID, session); err != nil {
+	if err := t.logActivity(ctx, purchaseIntentArgs, session); err != nil {
 		log.Errorf(ctx, "Failed to log PurchaseIntent activity: %v", err)
 	}
 
-	log.Infof(ctx, "Purchase intent logged: %s wants to buy %s for %s (%d%% confidence)", session.GetUserID(), purchaseIntentArgs.ItemName, purchaseIntentArgs.ItemPrice, purchaseIntentArgs.Percentage)
+	log.Infof(ctx, "Purchase intent logged: %s wants to buy %s for %s (%d%% confidence)", session.GetBuyerID(), purchaseIntentArgs.ItemName, purchaseIntentArgs.ItemPrice, purchaseIntentArgs.Percentage)
 	return "Purchase intent logged successfully", nil
 }
 
@@ -132,9 +129,8 @@ func (t *tool) GetGenkitTool(session toolsmanager.SessionContext, g *genkit.Genk
 			if err != nil {
 				return "", err
 			}
-
-			if resultStr, ok := result.(string); ok {
-				return resultStr, nil
+			if result != "" {
+				return result, nil
 			}
 			return "Purchase intent logged successfully", nil
 		})
@@ -154,19 +150,22 @@ func (t *tool) parseArgs(args interface{}, target interface{}) error {
 
 // sendPurchaseMessage sends a message to the chat channel
 func (t *tool) sendPurchaseMessage(session toolsmanager.SessionContext, args PurchaseIntentArgs) error {
-	outgoingMessage := &models.OutgoingMessage{
-		ChannelID: session.GetChannelID(),
-		SenderID:  session.GetSenderID(),
-		Message:   fmt.Sprintf(`[PURCHASE_INTENT %d%%] %s`, args.Percentage, args.Message),
+	ctx, cancel := util.NewTimeoutContext(session.Context(), 10*time.Second)
+	defer cancel()
+
+	req := internal_api.SendMessageRequest{
+		ChannelID: session.GetChannelID().Hex(),
+		SenderID:  session.GetMerchantID().Hex(),
+		Content:   fmt.Sprintf(`[PURCHASE_INTENT %d%%] %s`, args.Percentage, args.Message),
 	}
 
-	return t.chatAPIClient.SendMessage(session.Context(), outgoingMessage)
+	return t.internalAPIClient.SendMessage(ctx, req)
 }
 
 // logActivity logs the tool execution activity
-func (t *tool) logActivity(ctx context.Context, args PurchaseIntentArgs, sessionID primitive.ObjectID, session toolsmanager.SessionContext) error {
+func (t *tool) logActivity(ctx context.Context, args PurchaseIntentArgs, session toolsmanager.SessionContext) error {
 	activity := &models.ChatActivity{
-		SessionID: sessionID,
+		SessionID: session.GetSessionID(),
 		ChannelID: session.GetChannelID(),
 		Action:    models.ActivityPurchaseIntent,
 		Data:      args,

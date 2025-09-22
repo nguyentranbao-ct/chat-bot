@@ -11,7 +11,6 @@ type Channel struct {
 	Vendor        ChannelVendor      `bson:"vendor" json:"vendor" validate:"required"`
 	Name          string             `bson:"name" json:"name" validate:"required"`
 	Context       string             `bson:"context" json:"context"`
-	Type          string             `bson:"type" json:"type"`         // "direct", "group", etc.
 	Metadata      map[string]any     `bson:"metadata" json:"metadata"` // ItemName, ItemPrice, etc.
 	CreatedAt     time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt     time.Time          `bson:"updated_at" json:"updated_at"`

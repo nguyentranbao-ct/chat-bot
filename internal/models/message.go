@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 // KafkaMessage represents the top-level Kafka message structure
 type KafkaMessage struct {
@@ -87,9 +91,9 @@ type MessageHistory struct {
 }
 
 type HistoryMessage struct {
-	ID        string    `json:"id"`
-	ChannelID string    `json:"channel_id"`
-	SenderID  string    `json:"sender_id"`
-	Message   string    `json:"message"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        string             `json:"id"`
+	ChannelID primitive.ObjectID `json:"channel_id"`
+	SenderID  primitive.ObjectID `json:"sender_id"`
+	Content   string             `json:"content"`
+	CreatedAt time.Time          `json:"created_at"`
 }

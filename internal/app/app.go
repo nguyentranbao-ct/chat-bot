@@ -10,6 +10,7 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chotot"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/internal_api"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/socket"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/end_session"
@@ -51,11 +52,11 @@ func Invoke(funcs ...any) *fx.App {
 
 			// Use Cases
 			usecase.NewLLMUsecase,
-			usecase.NewMessageUsecase,
 			usecase.NewWhitelistService,
 			usecase.NewUserUsecase,
 			usecase.NewAuthUseCase,
 			usecase.NewChatUseCase,
+			usecase.NewLLMUsecaseV2,
 
 			// Repositories
 			mongodb.NewChatActivityRepository,
@@ -73,11 +74,12 @@ func Invoke(funcs ...any) *fx.App {
 			mongodb.NewMessageDedupRepository,
 			mongodb.NewMigrationRepository,
 
-			// External Clients
+			// repo clients
 			chatapi.NewChatAPIClient,
 			chotot.NewClient,
 			list_products.NewProductServiceRegistry,
 			socket.NewClient,
+			internal_api.NewClient,
 
 			// Vendor System
 			vendors.NewVendorRegistry,

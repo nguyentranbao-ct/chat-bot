@@ -183,7 +183,7 @@ func (r *chatMessageRepo) GetLatestMessage(ctx context.Context, channelID primit
 	err := r.collection.FindOne(ctx, filter, opts).Decode(&message)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, nil
+			return nil, models.ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get latest message: %w", err)
 	}

@@ -13,11 +13,7 @@ import (
 // sessionContext implements the SessionContext interface
 type sessionContext struct {
 	ctx                  context.Context
-	genkit               *genkit.Genkit
-	sessionID            primitive.ObjectID
-	channelID            string
-	userID               string
-	senderID             string
+	config               SessionContextConfig
 	ended                bool
 	nextMessageTimestamp *int64
 	sessionRepo          mongodb.ChatSessionRepository
@@ -27,9 +23,9 @@ type sessionContext struct {
 type SessionContextConfig struct {
 	Genkit      *genkit.Genkit
 	SessionID   primitive.ObjectID
-	ChannelID   string
-	UserID      string
-	SenderID    string
+	ChannelID   primitive.ObjectID
+	BuyerID     primitive.ObjectID
+	MerchantID  primitive.ObjectID
 	SessionRepo mongodb.ChatSessionRepository
 }
 
@@ -37,11 +33,7 @@ type SessionContextConfig struct {
 func NewSessionContext(ctx context.Context, config SessionContextConfig) SessionContext {
 	return &sessionContext{
 		ctx:         ctx,
-		genkit:      config.Genkit,
-		sessionID:   config.SessionID,
-		channelID:   config.ChannelID,
-		userID:      config.UserID,
-		senderID:    config.SenderID,
+		config:      config,
 		ended:       false,
 		sessionRepo: config.SessionRepo,
 	}
@@ -52,27 +44,27 @@ func (s *sessionContext) Context() context.Context {
 }
 
 func (s *sessionContext) Genkit() *genkit.Genkit {
-	return s.genkit
+	return s.config.Genkit
 }
 
 // GetSessionID returns the session ID as a string
-func (s *sessionContext) GetSessionID() string {
-	return s.sessionID.Hex()
+func (s *sessionContext) GetSessionID() primitive.ObjectID {
+	return s.config.SessionID
 }
 
 // GetChannelID returns the channel ID
-func (s *sessionContext) GetChannelID() string {
-	return s.channelID
+func (s *sessionContext) GetChannelID() primitive.ObjectID {
+	return s.config.ChannelID
 }
 
-// GetUserID returns the user ID
-func (s *sessionContext) GetUserID() string {
-	return s.userID
+// GetBuyerID returns the user ID
+func (s *sessionContext) GetBuyerID() primitive.ObjectID {
+	return s.config.BuyerID
 }
 
-// GetSenderID returns the sender ID
-func (s *sessionContext) GetSenderID() string {
-	return s.senderID
+// GetMerchantID returns the sender ID
+func (s *sessionContext) GetMerchantID() primitive.ObjectID {
+	return s.config.MerchantID
 }
 
 // EndSession terminates the session
@@ -81,12 +73,12 @@ func (s *sessionContext) EndSession() error {
 		return nil // Already ended
 	}
 
-	if err := s.sessionRepo.EndSession(context.Background(), s.sessionID); err != nil {
+	if err := s.sessionRepo.EndSession(s.ctx, s.config.SessionID); err != nil {
 		return fmt.Errorf("failed to end session: %w", err)
 	}
 
 	s.ended = true
-	log.Infof(context.Background(), "Session %s ended successfully", s.sessionID.Hex())
+	log.Infof(s.ctx, "Session %s ended successfully", s.config.SessionID.Hex())
 	return nil
 }
 

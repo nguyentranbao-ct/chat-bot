@@ -92,55 +92,6 @@ func (v *ChototVendor) GetChannelInfo(ctx context.Context, channelID string) (*V
 	return vendorChannelInfo, nil
 }
 
-// ListMessages retrieves messages from Chotot chat-api
-func (v *ChototVendor) ListMessages(ctx context.Context, params MessageListParams) ([]VendorMessage, error) {
-	if params.ChannelID == "" {
-		return nil, NewVendorError(VendorTypeChotot, "ListMessages", "channel ID cannot be empty", nil)
-	}
-
-	if params.UserID == "" {
-		return nil, NewVendorError(VendorTypeChotot, "ListMessages", "user ID cannot be empty", nil)
-	}
-
-	// Prepare chat-api request
-	req := chatapi.MessageHistoryRequest{
-		UserID:    params.UserID,
-		ChannelID: params.ChannelID,
-		Limit:     params.Limit,
-		BeforeTs:  params.BeforeTs,
-	}
-
-	// Set default limit if not specified
-	if req.Limit <= 0 {
-		req.Limit = 50
-	}
-
-	messageHistory, err := v.chatClient.GetMessageHistoryWithParams(ctx, req)
-	if err != nil {
-		return nil, NewVendorError(VendorTypeChotot, "ListMessages", "failed to get message history", err)
-	}
-
-	// Convert to vendor message format
-	vendorMessages := make([]VendorMessage, 0, len(messageHistory.Messages))
-	for _, msg := range messageHistory.Messages {
-		vendorMsg := VendorMessage{
-			ID:                msg.ID,
-			ChannelID:         msg.ChannelID,
-			SenderID:          msg.SenderID,
-			Content:           msg.Message,
-			MessageType:       "text", // Default for Chotot messages
-			CreatedAt:         msg.CreatedAt,
-			ExternalMessageID: msg.ID, // Use same ID as external ID
-			VendorMetadata: map[string]interface{}{
-				"source": "chotot_chat_api",
-			},
-		}
-		vendorMessages = append(vendorMessages, vendorMsg)
-	}
-
-	return vendorMessages, nil
-}
-
 // SendMessage sends a message through Chotot chat-api
 func (v *ChototVendor) SendMessage(ctx context.Context, params SendMessageParams) error {
 	if params.ChannelID == "" {

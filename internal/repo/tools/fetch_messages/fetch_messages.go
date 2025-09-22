@@ -9,10 +9,8 @@ import (
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
@@ -31,21 +29,20 @@ type Tool interface {
 
 // Tool implements the toolsmanager.Tool interface
 type tool struct {
-	chatAPIClient chatapi.Client
-	activityRepo  mongodb.ChatActivityRepository
+	messagesRepo mongodb.ChatMessageRepository
+	activityRepo mongodb.ChatActivityRepository
 }
 
 // NewTool creates a new FetchMessages tool instance
 func NewTool(
-	chatAPIClient chatapi.Client,
+	messagesRepo mongodb.ChatMessageRepository,
 	activityRepo mongodb.ChatActivityRepository,
 	toolsManager toolsmanager.ToolsManager,
 ) Tool {
 	t := &tool{
-		chatAPIClient: chatAPIClient,
-		activityRepo:  activityRepo,
+		messagesRepo: messagesRepo,
+		activityRepo: activityRepo,
 	}
-	toolsManager.AddTool(t)
 	return t
 }
 
@@ -72,13 +69,8 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 		fetchArgs.Limit = 100
 	}
 
-	// Fetch messages from chat API
-	messageHistory, err := t.chatAPIClient.GetMessageHistoryWithParams(ctx, chatapi.MessageHistoryRequest{
-		ChannelID: session.GetChannelID(),
-		UserID:    session.GetUserID(),
-		Limit:     fetchArgs.Limit,
-		BeforeTs:  session.GetNextMessageTimestamp(),
-	})
+	// Fetch messages from database
+	messages, err := t.messagesRepo.GetChannelMessages(ctx, session.GetChannelID(), fetchArgs.Limit, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch messages: %w", err)
 	}
@@ -88,8 +80,8 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 		log.Errorf(ctx, "Failed to log FetchMessages activity: %v", err)
 	}
 
-	log.Infof(ctx, "Fetched %d messages for channel %s", len(messageHistory.Messages), session.GetChannelID())
-	return messageHistory, nil
+	log.Infof(ctx, "Fetched %d messages for channel %s", len(messages), session.GetChannelID())
+	return messages, nil
 }
 
 // GetGenkitTool returns the Firebase Genkit tool definition for AI integration
@@ -100,11 +92,22 @@ func (t *tool) GetGenkitTool(session toolsmanager.SessionContext, g *genkit.Genk
 			if err != nil {
 				return nil, err
 			}
-
-			if messageHistory, ok := result.(*models.MessageHistory); ok {
-				return messageHistory, nil
+			// Convert []*models.ChatMessage to *models.MessageHistory
+			messages := result.([]*models.ChatMessage)
+			history := &models.MessageHistory{
+				Messages: make([]models.HistoryMessage, len(messages)),
+				HasMore:  len(messages) == input.Limit,
 			}
-			return nil, fmt.Errorf("unexpected result type from FetchMessages")
+			for i, msg := range messages {
+				history.Messages[i] = models.HistoryMessage{
+					ID:        msg.ID.Hex(),
+					ChannelID: msg.ChannelID,
+					SenderID:  msg.SenderID,
+					Content:   msg.Content,
+					CreatedAt: msg.CreatedAt,
+				}
+			}
+			return history, nil
 		})
 }
 
@@ -122,13 +125,8 @@ func (t *tool) parseArgs(args interface{}, target interface{}) error {
 
 // logActivity logs the tool execution activity
 func (t *tool) logActivity(ctx context.Context, args FetchMessagesArgs, session toolsmanager.SessionContext) error {
-	sessionID, err := primitive.ObjectIDFromHex(session.GetSessionID())
-	if err != nil {
-		return fmt.Errorf("invalid session ID: %w", err)
-	}
-
 	activity := &models.ChatActivity{
-		SessionID: sessionID,
+		SessionID: session.GetSessionID(),
 		ChannelID: session.GetChannelID(),
 		Action:    models.ActivityFetchMessages,
 		Data:      args,

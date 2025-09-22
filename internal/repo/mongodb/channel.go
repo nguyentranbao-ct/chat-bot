@@ -350,7 +350,7 @@ func (r *unreadCountRepo) GetUnreadCount(ctx context.Context, channelID primitiv
 	}).Decode(&unreadCount)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, nil
+			return nil, models.ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get unread count: %w", err)
 	}

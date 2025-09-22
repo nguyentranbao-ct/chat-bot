@@ -75,23 +75,6 @@ func (r *VendorRegistry) ListVendors() []VendorType {
 	return vendors
 }
 
-// detectVendorByPattern detects vendor based on channel ID patterns
-func (r *VendorRegistry) detectVendorByPattern(channelID string) VendorType {
-	// Facebook Messenger patterns
-	if strings.Contains(channelID, "facebook") ||
-		strings.Contains(channelID, "messenger") ||
-		strings.HasPrefix(channelID, "fb_") {
-		return VendorTypeFacebook
-	}
-
-	// Add more patterns as needed for other vendors
-	// Telegram: strings.HasPrefix(channelID, "tg_")
-	// WhatsApp: strings.HasPrefix(channelID, "wa_")
-
-	// Default case - return empty string to indicate no pattern match
-	return ""
-}
-
 // HealthCheckAll performs health checks on all registered vendors
 func (r *VendorRegistry) HealthCheckAll(ctx context.Context) map[VendorType]error {
 	r.mu.RLock()

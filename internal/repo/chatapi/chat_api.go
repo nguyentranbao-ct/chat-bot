@@ -9,19 +9,18 @@ import (
 	"github.com/carousell/chat-api/pkg/client"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type MessageHistoryRequest struct {
-	UserID    string
-	ChannelID string
+	UserID    primitive.ObjectID
+	ChannelID primitive.ObjectID
 	Limit     int
 	BeforeTs  *int64
 }
 
 type Client interface {
 	GetChannelInfo(ctx context.Context, channelID string) (*models.ChannelInfo, error)
-	GetMessageHistory(ctx context.Context, userID, channelID string, limit int) (*models.MessageHistory, error)
-	GetMessageHistoryWithParams(ctx context.Context, req MessageHistoryRequest) (*models.MessageHistory, error)
 	SendMessage(ctx context.Context, message *models.OutgoingMessage) error
 }
 
@@ -92,58 +91,6 @@ func (c *chatAPIClient) GetChannelInfo(ctx context.Context, channelID string) (*
 	}
 
 	return channelInfo, nil
-}
-
-func (c *chatAPIClient) GetMessageHistory(ctx context.Context, userID, channelID string, limit int) (*models.MessageHistory, error) {
-	req := MessageHistoryRequest{
-		UserID:    userID,
-		ChannelID: channelID,
-		Limit:     limit,
-		BeforeTs:  nil,
-	}
-	return c.GetMessageHistoryWithParams(ctx, req)
-}
-
-func (c *chatAPIClient) GetMessageHistoryWithParams(ctx context.Context, req MessageHistoryRequest) (*models.MessageHistory, error) {
-	// Create timeout context
-	timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	request := types.GetChannelMessagesRequest{
-		ProjectID: c.projectID,
-		UserID:    req.UserID,
-		ChannelID: req.ChannelID,
-		BeforeTS:  req.BeforeTs,
-		Limit:     uint(req.Limit),
-		Order:     "desc",
-	}
-
-	resp, err := c.client.GetChannelMessages(timeoutCtx, request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get channel messages: %w", err)
-	}
-
-	// Convert chat-api response to our internal model
-	history := &models.MessageHistory{
-		Messages: make([]models.HistoryMessage, 0, len(resp.Data)),
-		HasMore:  len(resp.Data) == int(request.Limit), // HasMore if we got the full limit
-	}
-
-	for _, msg := range resp.Data {
-		// Generate message ID from CreatedAt and SenderID
-		messageID := fmt.Sprintf("%d_%s", msg.CreatedAt, msg.SenderID)
-
-		historyMsg := models.HistoryMessage{
-			ID:        messageID,
-			ChannelID: msg.ChannelID,
-			SenderID:  msg.SenderID,
-			Message:   msg.Message,
-			CreatedAt: time.UnixMilli(msg.CreatedAt), // Convert from milliseconds
-		}
-		history.Messages = append(history.Messages, historyMsg)
-	}
-
-	return history, nil
 }
 
 func (c *chatAPIClient) SendMessage(ctx context.Context, message *models.OutgoingMessage) error {

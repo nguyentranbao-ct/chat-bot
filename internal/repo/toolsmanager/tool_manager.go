@@ -41,28 +41,6 @@ func (tm *toolsManager) AddTool(tool Tool) error {
 	return nil
 }
 
-// ExecuteTool executes a tool by name with the given arguments
-func (tm *toolsManager) ExecuteTool(ctx context.Context, toolName string, args interface{}, session SessionContext) (interface{}, error) {
-	tm.mutex.RLock()
-	tool, exists := tm.tools[toolName]
-	tm.mutex.RUnlock()
-
-	if !exists {
-		return nil, fmt.Errorf("tool not found: %s", toolName)
-	}
-
-	log.Debugw(ctx, "Executing tool", "tool_name", toolName)
-
-	result, err := tool.Execute(ctx, args, session)
-	if err != nil {
-		log.Errorw(ctx, "Tool execution failed", "tool_name", toolName, "error", err)
-		return nil, fmt.Errorf("tool execution failed: %w", err)
-	}
-
-	log.Debugw(ctx, "Tool executed successfully", "tool_name", toolName)
-	return result, nil
-}
-
 // GetAvailableTools returns a list of all registered tool names
 func (tm *toolsManager) GetAvailableTools() []string {
 	tm.mutex.RLock()

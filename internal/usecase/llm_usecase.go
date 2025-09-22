@@ -26,7 +26,7 @@ import (
 
 // LLMUsecase defines the interface for LLM operations
 type LLMUsecase interface {
-	ProcessMessage(ctx context.Context, chatMode *models.ChatMode, data *PromptData) error
+	ProcessMessage(ctx context.Context, chatMode *models.ChatMode, data *PromptContext) error
 }
 
 // llmUsecase is the concrete implementation
@@ -63,36 +63,47 @@ func NewLLMUsecase(
 	}, nil
 }
 
-// PromptData holds the data needed for prompt generation
-type PromptData struct {
-	ChannelInfo    *models.ChannelInfo
-	SessionID      string
-	UserID         string
-	SenderRole     string
+// PromptContext holds the data needed for prompt generation
+type PromptContext struct {
+	SessionID  primitive.ObjectID
+	MerchantID primitive.ObjectID
+	BuyerID    primitive.ObjectID
+
+	Channel        *models.Channel
 	Message        string
 	RecentMessages *models.MessageHistory
 }
 
+type PromptData struct {
+	Channel *models.Channel
+	Message string
+}
+
 // ProcessMessage processes a message with early validation and deferred expensive operations
-func (l *llmUsecase) ProcessMessage(ctx context.Context, chatMode *models.ChatMode, data *PromptData) error {
+func (l *llmUsecase) ProcessMessage(ctx context.Context, chatMode *models.ChatMode, data *PromptContext) error {
 	// PHASE 1: Early validation - validate all inputs before any expensive operations
 	if err := l.validateInputs(ctx, chatMode, data); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
 	// PHASE 2: Evaluate conditions - check if processing should proceed
-	shouldProcess, err := l.evaluateCondition(chatMode.Condition, data)
-	if err != nil {
-		return fmt.Errorf("failed to evaluate when condition: %w", err)
+	if chatMode.Condition != "" {
+		shouldProcess, err := l.evaluateCondition(chatMode.Condition, data)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate when condition: %w", err)
+		}
+		if !shouldProcess {
+			l.logConditionResult(ctx, chatMode, data, false)
+			return nil // Early exit - no error, just don't process
+		}
+		l.logConditionResult(ctx, chatMode, data, true)
 	}
-	if !shouldProcess {
-		l.logConditionResult(ctx, chatMode, data, false)
-		return nil // Early exit - no error, just don't process
-	}
-	l.logConditionResult(ctx, chatMode, data, true)
 
 	// PHASE 3: Build prompt - only after validation passes
-	prompt, err := l.buildPrompt(chatMode.PromptTemplate, data)
+	prompt, err := l.buildPrompt(chatMode.PromptTemplate, &PromptData{
+		Channel: data.Channel,
+		Message: data.Message,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to build prompt: %w", err)
 	}
@@ -124,7 +135,7 @@ func (l *llmUsecase) ProcessMessage(ctx context.Context, chatMode *models.ChatMo
 }
 
 // validateInputs performs comprehensive validation before any processing
-func (l *llmUsecase) validateInputs(ctx context.Context, chatMode *models.ChatMode, data *PromptData) error {
+func (l *llmUsecase) validateInputs(ctx context.Context, chatMode *models.ChatMode, data *PromptContext) error {
 	// Validate chat mode
 	if chatMode == nil {
 		return fmt.Errorf("chat mode is required")
@@ -146,24 +157,8 @@ func (l *llmUsecase) validateInputs(ctx context.Context, chatMode *models.ChatMo
 	if data == nil {
 		return fmt.Errorf("prompt data is required")
 	}
-	if data.SessionID == "" {
-		return fmt.Errorf("session ID is required")
-	}
-	if data.UserID == "" {
-		return fmt.Errorf("user ID is required")
-	}
 	if data.Message == "" {
 		return fmt.Errorf("message is required")
-	}
-
-	// Validate session ID format
-	if _, err := primitive.ObjectIDFromHex(data.SessionID); err != nil {
-		return fmt.Errorf("invalid session ID format: %w", err)
-	}
-
-	// Validate channel info if provided
-	if data.ChannelInfo != nil && data.ChannelInfo.ID == "" {
-		return fmt.Errorf("channel ID is required when channel info is provided")
 	}
 
 	// Validate available tools exist
@@ -178,21 +173,7 @@ func (l *llmUsecase) validateInputs(ctx context.Context, chatMode *models.ChatMo
 }
 
 // createSessionContext creates session context after validation passes
-func (l *llmUsecase) createSessionContext(ctx context.Context, data *PromptData) (toolsmanager.SessionContext, error) {
-	sessionID, err := primitive.ObjectIDFromHex(data.SessionID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid session ID: %w", err)
-	}
-
-	channelID := l.getChannelID(data)
-	userID := data.UserID
-
-	// Find the seller ID from channel participants to act as the bot's sender identity
-	sellerID := findSellerIDFromChannel(data.ChannelInfo)
-	if sellerID == "" {
-		sellerID = "chat-bot" // Default fallback
-	}
-
+func (l *llmUsecase) createSessionContext(ctx context.Context, data *PromptContext) (toolsmanager.SessionContext, error) {
 	gk := genkit.Init(ctx, genkit.WithPlugins(&googlegenai.GoogleAI{
 		APIKey: l.config.LLM.GoogleAIAPIKey,
 	}))
@@ -200,11 +181,11 @@ func (l *llmUsecase) createSessionContext(ctx context.Context, data *PromptData)
 	// Create session context for tool operations
 	session := toolsmanager.NewSessionContext(ctx, toolsmanager.SessionContextConfig{
 		Genkit:      gk,
-		SessionID:   sessionID,
-		ChannelID:   channelID,
-		UserID:      userID,
-		SenderID:    sellerID,
+		SessionID:   data.SessionID,
+		ChannelID:   data.Channel.ID,
 		SessionRepo: l.sessionRepo,
+		BuyerID:     data.BuyerID,
+		MerchantID:  data.MerchantID,
 	})
 
 	return session, nil
@@ -221,12 +202,13 @@ func (l *llmUsecase) buildPrompt(templateStr string, data *PromptData) (string, 
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
+	log.Info(context.Background(), "Generated prompt:\n"+buf.String())
 
 	return buf.String(), nil
 }
 
 // evaluateCondition evaluates the when condition template
-func (l *llmUsecase) evaluateCondition(whenTemplate string, data *PromptData) (bool, error) {
+func (l *llmUsecase) evaluateCondition(whenTemplate string, data *PromptContext) (bool, error) {
 	if whenTemplate == "" {
 		return true, nil // No condition means always process
 	}
@@ -246,7 +228,7 @@ func (l *llmUsecase) evaluateCondition(whenTemplate string, data *PromptData) (b
 }
 
 // buildInitialMessages creates the initial message array for the AI
-func (l *llmUsecase) buildInitialMessages(prompt string, data *PromptData, session toolsmanager.SessionContext) []*ai.Message {
+func (l *llmUsecase) buildInitialMessages(prompt string, data *PromptContext, session toolsmanager.SessionContext) []*ai.Message {
 	messages := []*ai.Message{
 		ai.NewSystemTextMessage(prompt),
 	}
@@ -260,15 +242,15 @@ func (l *llmUsecase) buildInitialMessages(prompt string, data *PromptData, sessi
 }
 
 // addRecentMessages adds recent message history to the conversation
-func (l *llmUsecase) addRecentMessages(messages []*ai.Message, data *PromptData, session toolsmanager.SessionContext) []*ai.Message {
+func (l *llmUsecase) addRecentMessages(messages []*ai.Message, data *PromptContext, session toolsmanager.SessionContext) []*ai.Message {
 	for _, msg := range data.RecentMessages.Messages {
-		if msg.Message == "" {
+		if msg.Content == "" {
 			continue
 		}
-		if msg.SenderID == data.UserID {
-			messages = append(messages, ai.NewUserTextMessage(msg.Message))
+		if msg.SenderID == data.BuyerID {
+			messages = append(messages, ai.NewUserTextMessage(msg.Content))
 		} else {
-			messages = append(messages, ai.NewModelTextMessage(msg.Message))
+			messages = append(messages, ai.NewModelTextMessage(msg.Content))
 		}
 	}
 
@@ -367,23 +349,12 @@ func (l *llmUsecase) findToolByName(name string, availableTools []ai.Tool) ai.To
 }
 
 // logConditionResult logs the result of condition evaluation
-func (l *llmUsecase) logConditionResult(ctx context.Context, chatMode *models.ChatMode, data *PromptData, shouldProcess bool) {
+func (l *llmUsecase) logConditionResult(ctx context.Context, chatMode *models.ChatMode, data *PromptContext, shouldProcess bool) {
 	if shouldProcess {
 		log.Infow(ctx, "When condition evaluated to true, proceeding with processing",
-			"chat_mode", chatMode.Name,
-			"sender_role", data.SenderRole)
+			"chat_mode", chatMode.Name)
 	} else {
 		log.Infow(ctx, "When condition evaluated to false, stopping processing",
-			"chat_mode", chatMode.Name,
-			"sender_role", data.SenderRole,
-			"user_id", data.UserID)
+			"chat_mode", chatMode)
 	}
-}
-
-// getChannelID safely extracts channel ID from prompt data
-func (l *llmUsecase) getChannelID(data *PromptData) string {
-	if data.ChannelInfo != nil && data.ChannelInfo.ID != "" {
-		return data.ChannelInfo.ID
-	}
-	return "unknown-channel"
 }

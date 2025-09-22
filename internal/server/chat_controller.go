@@ -11,12 +11,14 @@ import (
 
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/util"
 )
 
 type ChatController interface {
 	GetChannels(c echo.Context) error
 	GetChannelMembers(c echo.Context) error
 	SendMessage(c echo.Context) error
+	SendInternalMessage(c echo.Context) error
 	GetChannelEvents(c echo.Context) error
 	GetChannelMessages(c echo.Context) error
 	MarkAsRead(c echo.Context) error
@@ -103,6 +105,9 @@ func (cc *chatController) SendMessage(c echo.Context) error {
 
 	// Broadcast message to all channel members via socket
 	go func() {
+		ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
+		defer cancel()
+
 		members, err := cc.chatUsecase.GetChannelMembers(ctx, channelID)
 		if err != nil {
 			fmt.Printf("Failed to get channel members for socket broadcast: %v\n", err)
@@ -117,10 +122,68 @@ func (cc *chatController) SendMessage(c echo.Context) error {
 		cc.socketBroadcaster.BroadcastMessageToUsers(userIDs, message)
 	}()
 
-	// Send confirmation to sender
-	cc.socketBroadcaster.BroadcastMessageSent(user.ID.Hex(), message)
-
 	return c.JSON(http.StatusCreated, message)
+}
+
+type SendInternalMessageRequest struct {
+	ChannelID string `json:"channel_id" validate:"required"`
+	SenderID  string `json:"sender_id" validate:"required"`
+	Content   string `json:"content" validate:"required"`
+}
+
+func (cc *chatController) SendInternalMessage(c echo.Context) error {
+	var req SendInternalMessageRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	channelID, err := primitive.ObjectIDFromHex(req.ChannelID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid channel ID")
+	}
+
+	senderID, err := primitive.ObjectIDFromHex(req.SenderID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid sender ID")
+	}
+
+	ctx := c.Request().Context()
+	params := usecase.SendMessageParams{
+		ChannelID:   channelID,
+		SenderID:    senderID,
+		Content:     req.Content,
+		MessageType: "text",
+		Metadata:    map[string]interface{}{"source": "internal_api"},
+	}
+
+	message, err := cc.chatUsecase.SendMessage(ctx, params)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	// Broadcast message to all channel members via socket
+	go func() {
+		ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
+		defer cancel()
+
+		members, err := cc.chatUsecase.GetChannelMembers(ctx, channelID)
+		if err != nil {
+			fmt.Printf("Failed to get channel members for internal message broadcast: %v\n", err)
+			return
+		}
+
+		userIDs := make([]string, 0, len(members))
+		for _, member := range members {
+			userIDs = append(userIDs, member.UserID.Hex())
+		}
+
+		cc.socketBroadcaster.BroadcastMessageToUsers(userIDs, message)
+	}()
+
+	return c.JSON(http.StatusCreated, map[string]interface{}{
+		"message": "Message sent successfully",
+		"id":      message.ID.Hex(),
+	})
 }
 
 func (cc *chatController) GetChannelEvents(c echo.Context) error {
