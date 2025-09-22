@@ -1,4 +1,4 @@
-package vendors
+package partners
 
 import (
 	"context"
@@ -8,17 +8,17 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/list_products"
 )
 
-// VendorType represents the type of vendor
-type VendorType string
+// PartnerType represents the type of partner
+type PartnerType string
 
 const (
-	VendorTypeChotot   VendorType = "chotot"
-	VendorTypeFacebook VendorType = "facebook"
-	// Future vendors: telegram, whatsapp, etc.
+	PartnerTypeChotot   PartnerType = "chotot"
+	PartnerTypeFacebook PartnerType = "facebook"
+	// Future partners: telegram, whatsapp, etc.
 )
 
-// VendorMessage represents a normalized message from any vendor
-type VendorMessage struct {
+// PartnerMessage represents a normalized message from any partner
+type PartnerMessage struct {
 	ID                string                 `json:"id"`
 	ChannelID         string                 `json:"channel_id"`
 	SenderID          string                 `json:"sender_id"`
@@ -26,22 +26,22 @@ type VendorMessage struct {
 	MessageType       string                 `json:"message_type"`
 	CreatedAt         time.Time              `json:"created_at"`
 	ExternalMessageID string                 `json:"external_message_id"`
-	VendorMetadata    map[string]interface{} `json:"vendor_metadata"`
+	PartnerMetadata   map[string]interface{} `json:"partner_metadata"`
 }
 
-// VendorChannelInfo represents normalized channel info from any vendor
-type VendorChannelInfo struct {
-	ID           string                 `json:"id"` // external vendor channel ID
+// PartnerChannelInfo represents normalized channel info from any partner
+type PartnerChannelInfo struct {
+	ID           string                 `json:"id"` // external partner channel ID
 	Name         string                 `json:"name"`
 	Context      string                 `json:"context"`
 	Type         string                 `json:"type"` // "direct", "group", etc.
 	Participants []models.Participant   `json:"participants"`
-	VendorType   VendorType             `json:"vendor_type"`
+	PartnerType  PartnerType            `json:"partner_type"`
 	Metadata     map[string]interface{} `json:"metadata"` // ItemName, ItemPrice, etc.
 }
 
-// VendorCapabilities defines what operations a vendor supports
-type VendorCapabilities struct {
+// PartnerCapabilities defines what operations a partner supports
+type PartnerCapabilities struct {
 	CanListMessages    bool `json:"can_list_messages"`
 	CanSendMessage     bool `json:"can_send_message"`
 	CanGetChannelInfo  bool `json:"can_get_channel_info"`
@@ -80,27 +80,27 @@ type UserProductsResult struct {
 	Total    int                     `json:"total"`
 }
 
-// VendorUserInfo represents normalized user info from any vendor
-type VendorUserInfo struct {
-	ID         string                 `json:"id"` // external vendor user ID
-	Name       string                 `json:"name"`
-	Email      string                 `json:"email"`
-	VendorType VendorType             `json:"vendor_type"`
-	Metadata   map[string]interface{} `json:"metadata"`
-	IsActive   bool                   `json:"is_active"`
+// PartnerUserInfo represents normalized user info from any partner
+type PartnerUserInfo struct {
+	ID          string                 `json:"id"` // external partner user ID
+	Name        string                 `json:"name"`
+	Email       string                 `json:"email"`
+	PartnerType PartnerType            `json:"partner_type"`
+	Metadata    map[string]interface{} `json:"metadata"`
+	IsActive    bool                   `json:"is_active"`
 }
 
-// Vendor interface defines the operations that all vendors must support
-type Vendor interface {
+// Partner interface defines the operations that all partners must support
+type Partner interface {
 	// Core identification
-	GetVendorType() VendorType
-	GetCapabilities() VendorCapabilities
+	GetPartnerType() PartnerType
+	GetCapabilities() PartnerCapabilities
 
 	// Channel operations
-	GetChannelInfo(ctx context.Context, channelID string) (*VendorChannelInfo, error)
+	GetChannelInfo(ctx context.Context, channelID string) (*PartnerChannelInfo, error)
 
 	// User operations
-	GetUserInfo(ctx context.Context, userID string) (*VendorUserInfo, error)
+	GetUserInfo(ctx context.Context, userID string) (*PartnerUserInfo, error)
 
 	// Message operations
 	SendMessage(ctx context.Context, params SendMessageParams) error
@@ -112,50 +112,50 @@ type Vendor interface {
 	HealthCheck(ctx context.Context) error
 }
 
-// VendorError represents vendor-specific errors with additional context
-type VendorError struct {
-	VendorType VendorType `json:"vendor_type"`
-	Operation  string     `json:"operation"`
-	Message    string     `json:"message"`
-	Code       string     `json:"code,omitempty"`
-	Cause      error      `json:"-"`
+// PartnerError represents partner-specific errors with additional context
+type PartnerError struct {
+	PartnerType PartnerType `json:"partner_type"`
+	Operation   string      `json:"operation"`
+	Message     string      `json:"message"`
+	Code        string      `json:"code,omitempty"`
+	Cause       error       `json:"-"`
 }
 
-func (e *VendorError) Error() string {
+func (e *PartnerError) Error() string {
 	if e.Cause != nil {
 		return e.Message + ": " + e.Cause.Error()
 	}
 	return e.Message
 }
 
-func (e *VendorError) Unwrap() error {
+func (e *PartnerError) Unwrap() error {
 	return e.Cause
 }
 
-// NewVendorError creates a new vendor error
-func NewVendorError(vendorType VendorType, operation, message string, cause error) *VendorError {
-	return &VendorError{
-		VendorType: vendorType,
-		Operation:  operation,
-		Message:    message,
-		Cause:      cause,
+// NewPartnerError creates a new partner error
+func NewPartnerError(partnerType PartnerType, operation, message string, cause error) *PartnerError {
+	return &PartnerError{
+		PartnerType: partnerType,
+		Operation:   operation,
+		Message:     message,
+		Cause:       cause,
 	}
 }
 
-// ErrVendorNotSupported is returned when a vendor doesn't support an operation
-type ErrVendorNotSupported struct {
-	VendorType VendorType
-	Operation  string
+// ErrPartnerNotSupported is returned when a partner doesn't support an operation
+type ErrPartnerNotSupported struct {
+	PartnerType PartnerType
+	Operation   string
 }
 
-func (e *ErrVendorNotSupported) Error() string {
-	return string(e.VendorType) + " vendor does not support " + e.Operation
+func (e *ErrPartnerNotSupported) Error() string {
+	return string(e.PartnerType) + " partner does not support " + e.Operation
 }
 
-// NewErrVendorNotSupported creates a new vendor not supported error
-func NewErrVendorNotSupported(vendorType VendorType, operation string) *ErrVendorNotSupported {
-	return &ErrVendorNotSupported{
-		VendorType: vendorType,
-		Operation:  operation,
+// NewErrPartnerNotSupported creates a new partner not supported error
+func NewErrPartnerNotSupported(partnerType PartnerType, operation string) *ErrPartnerNotSupported {
+	return &ErrPartnerNotSupported{
+		PartnerType: partnerType,
+		Operation:   operation,
 	}
 }

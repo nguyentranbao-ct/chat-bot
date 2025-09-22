@@ -29,8 +29,8 @@ func SetupChannels(userRepo mongodb.UserRepository, channelRepo mongodb.ChannelR
 
 	// Create channels if they don't exist
 	for _, defaultChannel := range defaultChannels {
-		// Use GetByVendorChannelID instead of deprecated GetByExternalChannelID for consistency
-		existingChannel, err := channelRepo.GetByVendorChannelID(ctx, "chotot", defaultChannel.ExternalChannelID)
+		// Use GetByPartnerChannelID instead of deprecated GetByExternalChannelID for consistency
+		existingChannel, err := channelRepo.GetByPartnerChannelID(ctx, "chotot", defaultChannel.ExternalChannelID)
 		if err != nil && existingChannel == nil {
 			// Find owner user by email
 			ownerUser, err := userRepo.GetByEmail(ctx, defaultChannel.OwnerEmail)
@@ -51,22 +51,21 @@ func SetupChannels(userRepo mongodb.UserRepository, channelRepo mongodb.ChannelR
 			}
 
 			channel := &models.Channel{
-				Vendor: models.ChannelVendor{
+				Source: models.ChannelPartner{
 					ChannelID: defaultChannel.ExternalChannelID,
-					Name:      "chotot", // Default vendor for demo channels
+					Name:      "chotot", // Default partner for demo channels
 				},
-				Name:       defaultChannel.Name,
-				Context:    defaultChannel.Context,
-				Metadata:   metadata,
-				CreatedAt:  now,
-				UpdatedAt:  now,
-				IsArchived: false,
+				Name:      defaultChannel.Name,
+				Context:   defaultChannel.Context,
+				Metadata:  metadata,
+				CreatedAt: now,
+				UpdatedAt: now,
 			}
 
 			if err := channelRepo.Create(ctx, channel); err != nil {
 				return fmt.Errorf("failed to create channel '%s': %w", defaultChannel.ExternalChannelID, err)
 			}
-			log.Infow(ctx, "Created default channel", "vendor_channel_id", defaultChannel.ExternalChannelID, "name", defaultChannel.Name)
+			log.Infow(ctx, "Created default channel", "partner_channel_id", defaultChannel.ExternalChannelID, "name", defaultChannel.Name)
 
 			// Create channel member for the owner
 			member := &models.ChannelMember{
@@ -74,15 +73,14 @@ func SetupChannels(userRepo mongodb.UserRepository, channelRepo mongodb.ChannelR
 				UserID:    ownerUser.ID, // Using email as user ID for simplicity
 				Role:      "seller",
 				JoinedAt:  now,
-				IsActive:  true,
 			}
 
 			if err := channelMemberRepo.Create(ctx, member); err != nil {
 				return fmt.Errorf("failed to create channel member for '%s': %w", defaultChannel.ExternalChannelID, err)
 			}
-			log.Infow(ctx, "Created channel member", "vendor_channel_id", defaultChannel.ExternalChannelID, "user_id", defaultChannel.OwnerEmail)
+			log.Infow(ctx, "Created channel member", "partner_channel_id", defaultChannel.ExternalChannelID, "user_id", defaultChannel.OwnerEmail)
 		} else {
-			log.Debugw(ctx, "Channel already exists", "vendor_channel_id", defaultChannel.ExternalChannelID)
+			log.Debugw(ctx, "Channel already exists", "partner_channel_id", defaultChannel.ExternalChannelID)
 		}
 	}
 	return nil

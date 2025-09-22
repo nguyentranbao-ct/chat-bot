@@ -68,7 +68,6 @@ func (cc *chatController) GetChannelMembers(c echo.Context) error {
 type SendMessageRequest struct {
 	Content     string                 `json:"content"`
 	MessageType string                 `json:"message_type"`
-	Blocks      []models.MessageBlock  `json:"blocks"`
 	Metadata    map[string]interface{} `json:"metadata"`
 }
 
@@ -86,18 +85,16 @@ func (cc *chatController) SendMessage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	if req.Content == "" && len(req.Blocks) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "message content or blocks required")
+	if req.Content == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "message content required")
 	}
 
 	ctx := c.Request().Context()
 	params := usecase.SendMessageParams{
-		ChannelID:   channelID,
-		SenderID:    user.ID,
-		Content:     req.Content,
-		MessageType: req.MessageType,
-		Blocks:      req.Blocks,
-		Metadata:    req.Metadata,
+		ChannelID: channelID,
+		SenderID:  user.ID,
+		Content:   req.Content,
+		Metadata:  req.Metadata,
 	}
 	message, err := cc.chatUsecase.SendMessage(ctx, params)
 	if err != nil {
@@ -147,9 +144,8 @@ func (cc *chatController) SendInternalMessage(c echo.Context) error {
 		ChannelID:   channelID,
 		SenderID:    senderID,
 		Content:     req.Content,
-		MessageType: "text",
-		Metadata:    map[string]interface{}{"source": "internal_api"},
-		SkipVendor:  req.SkipVendor,
+		Metadata:    map[string]interface{}{"source": "internal"},
+		SkipPartner: req.SkipPartner,
 	}
 
 	message, err := cc.chatUsecase.SendMessage(ctx, params)

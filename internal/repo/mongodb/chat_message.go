@@ -21,7 +21,7 @@ type ChatMessageRepository interface {
 	GetByExternalMessageID(ctx context.Context, externalMessageID string) (*models.ChatMessage, error)
 	GetLatestMessage(ctx context.Context, channelID primitive.ObjectID) (*models.ChatMessage, error)
 	GetUnreadMessages(ctx context.Context, channelID primitive.ObjectID, userID string, lastReadMessageID *primitive.ObjectID) ([]*models.ChatMessage, error)
-	UpdateMessage(ctx context.Context, messageID primitive.ObjectID, content string, blocks []models.MessageBlock) error
+	UpdateMessage(ctx context.Context, messageID primitive.ObjectID, content string) error
 	SoftDeleteMessage(ctx context.Context, messageID primitive.ObjectID) error
 	UpdateDeliveryStatus(ctx context.Context, messageID primitive.ObjectID, status string) error
 	GetMessagesByTimeRange(ctx context.Context, channelID primitive.ObjectID, startTime, endTime time.Time) ([]*models.ChatMessage, error)
@@ -56,9 +56,6 @@ func (r *chatMessageRepo) Upsert(ctx context.Context, message *models.ChatMessag
 	if !message.ID.IsZero() {
 		// Use ID if provided
 		filter = bson.M{"_id": message.ID}
-	} else if message.ExternalMessageID != "" {
-		// Use external message ID as fallback
-		filter = bson.M{"external_message_id": message.ExternalMessageID}
 	} else {
 		// If no ID provided, generate new one and insert
 		message.ID = primitive.NewObjectID()
@@ -73,19 +70,11 @@ func (r *chatMessageRepo) Upsert(ctx context.Context, message *models.ChatMessag
 
 	update := bson.M{
 		"$set": bson.M{
-			"channel_id":          message.ChannelID,
-			"sender_id":           message.SenderID,
-			"content":             message.Content,
-			"blocks":              message.Blocks,
-			"thread_id":           message.ThreadID,
-			"reply_to_message_id": message.ReplyToMessageID,
-			"updated_at":          now,
-			"is_deleted":          message.IsDeleted,
-			"is_edited":           message.IsEdited,
-			"edited_at":           message.EditedAt,
-			"metadata":            message.Metadata,
-			"external_message_id": message.ExternalMessageID,
-			"delivery_status":     message.DeliveryStatus,
+			"channel_id": message.ChannelID,
+			"sender_id":  message.SenderID,
+			"content":    message.Content,
+			"updated_at": now,
+			"metadata":   message.Metadata,
 		},
 		"$setOnInsert": bson.M{
 			"created_at": now,
@@ -127,7 +116,6 @@ func (r *chatMessageRepo) GetByID(ctx context.Context, id primitive.ObjectID) (*
 func (r *chatMessageRepo) GetChannelMessages(ctx context.Context, channelID primitive.ObjectID, limit int, before *primitive.ObjectID) ([]*models.ChatMessage, error) {
 	filter := bson.M{
 		"channel_id": channelID,
-		"is_deleted": false,
 	}
 
 	if before != nil {
@@ -175,7 +163,6 @@ func (r *chatMessageRepo) GetByExternalMessageID(ctx context.Context, externalMe
 func (r *chatMessageRepo) GetLatestMessage(ctx context.Context, channelID primitive.ObjectID) (*models.ChatMessage, error) {
 	filter := bson.M{
 		"channel_id": channelID,
-		"is_deleted": false,
 	}
 
 	opts := options.FindOne().SetSort(bson.D{{Key: "created_at", Value: -1}})
@@ -193,7 +180,6 @@ func (r *chatMessageRepo) GetLatestMessage(ctx context.Context, channelID primit
 func (r *chatMessageRepo) GetUnreadMessages(ctx context.Context, channelID primitive.ObjectID, userID string, lastReadMessageID *primitive.ObjectID) ([]*models.ChatMessage, error) {
 	filter := bson.M{
 		"channel_id": channelID,
-		"is_deleted": false,
 		"sender_id":  bson.M{"$ne": userID}, // exclude user's own messages
 	}
 
@@ -224,13 +210,11 @@ func (r *chatMessageRepo) GetUnreadMessages(ctx context.Context, channelID primi
 	return messages, nil
 }
 
-func (r *chatMessageRepo) UpdateMessage(ctx context.Context, messageID primitive.ObjectID, content string, blocks []models.MessageBlock) error {
+func (r *chatMessageRepo) UpdateMessage(ctx context.Context, messageID primitive.ObjectID, content string) error {
 	filter := bson.M{"_id": messageID}
 	update := bson.M{
 		"$set": bson.M{
 			"content":    content,
-			"blocks":     blocks,
-			"is_edited":  true,
 			"edited_at":  time.Now(),
 			"updated_at": time.Now(),
 		},
@@ -244,7 +228,6 @@ func (r *chatMessageRepo) SoftDeleteMessage(ctx context.Context, messageID primi
 	filter := bson.M{"_id": messageID}
 	update := bson.M{
 		"$set": bson.M{
-			"is_deleted": true,
 			"updated_at": time.Now(),
 		},
 	}
@@ -273,7 +256,6 @@ func (r *chatMessageRepo) GetMessagesByTimeRange(ctx context.Context, channelID 
 			"$gte": startTime,
 			"$lte": endTime,
 		},
-		"is_deleted": false,
 	}
 
 	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: 1}})

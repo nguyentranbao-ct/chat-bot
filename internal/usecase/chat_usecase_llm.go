@@ -50,7 +50,7 @@ func (uc *llmUsecaseV2) TriggerLLM(ctx context.Context, message *models.ChatMess
 	ctx, cancel := util.NewTimeoutContext(ctx, 180*time.Second)
 	defer cancel()
 
-	log.Infof(ctx, "Processing LLM trigger for message from user %s in channel %s", message.SenderID.Hex(), channel.Vendor.ChannelID)
+	log.Infof(ctx, "Processing LLM trigger for message from user %s in channel %s", message.SenderID.Hex(), channel.Source.ChannelID)
 
 	user, err := uc.userRepo.GetByID(ctx, message.SenderID)
 	if err != nil {
@@ -62,7 +62,7 @@ func (uc *llmUsecaseV2) TriggerLLM(ctx context.Context, message *models.ChatMess
 		return nil
 	}
 
-	chatModeKey := fmt.Sprintf("%s_chat_mode", channel.Vendor.Name)
+	chatModeKey := fmt.Sprintf("%s_chat_mode", channel.Source.Name)
 
 	chatMode, err := uc.getChatModeForUser(ctx, message.SenderID, chatModeKey)
 	if err != nil {
@@ -183,6 +183,6 @@ func (uc *llmUsecaseV2) createSession(ctx context.Context, message *models.ChatM
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
-	log.Infof(ctx, "Created new session %s for user %s in channel %s", session.ID.Hex(), message.SenderID.Hex(), channel.Vendor.ChannelID)
+	log.Infof(ctx, "Created new session %s for user %s in channel %s", session.ID.Hex(), message.SenderID.Hex(), channel.Source.ChannelID)
 	return session, nil
 }

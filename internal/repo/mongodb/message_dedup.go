@@ -16,18 +16,18 @@ type MessageDeduplication struct {
 	ID                primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	ExternalMessageID string             `bson:"external_message_id" json:"external_message_id"`
 	ChannelID         string             `bson:"channel_id" json:"channel_id"`
-	VendorName        string             `bson:"vendor_name" json:"vendor_name"`
+	PartnerName       string             `bson:"partner_name" json:"partner_name"`
 	MessageHash       string             `bson:"message_hash" json:"message_hash"`
 	SenderID          string             `bson:"sender_id" json:"sender_id"`
 	Content           string             `bson:"content" json:"content"`
-	Source            string             `bson:"source" json:"source"` // "kafka", "api", "vendor"
+	Source            string             `bson:"source" json:"source"` // "kafka", "api", "partner"
 	ProcessedAt       time.Time          `bson:"processed_at" json:"processed_at"`
 	ExpiresAt         time.Time          `bson:"expires_at" json:"expires_at"` // TTL index
 }
 
 // MessageDedupRepository handles message deduplication operations
 type MessageDedupRepository interface {
-	IsMessageProcessed(ctx context.Context, externalMessageID, channelID, vendorName string) (bool, error)
+	IsMessageProcessed(ctx context.Context, externalMessageID, channelID, partnerName string) (bool, error)
 	IsMessageDuplicate(ctx context.Context, messageHash, channelID string, withinDuration time.Duration) (bool, error)
 	RecordProcessedMessage(ctx context.Context, record *MessageDeduplication) error
 	CleanupExpiredRecords(ctx context.Context) error
@@ -63,11 +63,11 @@ func (r *messageDedupRepo) createIndexes(ctx context.Context) {
 		Keys: bson.D{
 			{Key: "external_message_id", Value: 1},
 			{Key: "channel_id", Value: 1},
-			{Key: "vendor_name", Value: 1},
+			{Key: "partner_name", Value: 1},
 		},
 		Options: options.Index().
 			SetUnique(true).
-			SetName("external_msg_channel_vendor"),
+			SetName("external_msg_channel_partner"),
 	}
 
 	// Compound index for message hash lookup
@@ -98,7 +98,7 @@ func (r *messageDedupRepo) createIndexes(ctx context.Context) {
 	}
 }
 
-func (r *messageDedupRepo) IsMessageProcessed(ctx context.Context, externalMessageID, channelID, vendorName string) (bool, error) {
+func (r *messageDedupRepo) IsMessageProcessed(ctx context.Context, externalMessageID, channelID, partnerName string) (bool, error) {
 	if externalMessageID == "" {
 		return false, nil // Can't check without external ID
 	}
@@ -106,7 +106,7 @@ func (r *messageDedupRepo) IsMessageProcessed(ctx context.Context, externalMessa
 	filter := bson.M{
 		"external_message_id": externalMessageID,
 		"channel_id":          channelID,
-		"vendor_name":         vendorName,
+		"partner_name":        partnerName,
 	}
 
 	count, err := r.collection.CountDocuments(ctx, filter, options.Count().SetLimit(1))
@@ -157,7 +157,7 @@ func (r *messageDedupRepo) RecordProcessedMessage(ctx context.Context, record *M
 	filter := bson.M{
 		"external_message_id": record.ExternalMessageID,
 		"channel_id":          record.ChannelID,
-		"vendor_name":         record.VendorName,
+		"partner_name":        record.PartnerName,
 	}
 
 	update := bson.M{
@@ -172,8 +172,8 @@ func (r *messageDedupRepo) RecordProcessedMessage(ctx context.Context, record *M
 
 	// If the document was not inserted (UpsertedCount == 0), it means it already existed
 	if result.UpsertedCount == 0 {
-		return fmt.Errorf("message already processed: external_id=%s, channel=%s, vendor=%s",
-			record.ExternalMessageID, record.ChannelID, record.VendorName)
+		return fmt.Errorf("message already processed: external_id=%s, channel=%s, partner=%s",
+			record.ExternalMessageID, record.ChannelID, record.PartnerName)
 	}
 
 	return nil

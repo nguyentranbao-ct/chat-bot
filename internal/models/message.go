@@ -37,7 +37,7 @@ type IncomingMessage struct {
 	SenderID  string              `json:"sender_id" validate:"required"`
 	Content   string              `json:"content" validate:"required"`
 	Metadata  IncomingMessageMeta `json:"metadata"`
-	Vendor    VendorInfo          `json:"vendor"`
+	Partner   Source              `json:"partner"`
 }
 
 type IncomingMessageMeta struct {
@@ -48,27 +48,27 @@ type LLMMetadata struct {
 	ChatMode string `json:"chat_mode" validate:"required"`
 }
 
-type VendorInfo struct {
+type Source struct {
 	Name      string `json:"name"`
 	ChannelID string `json:"channel_id"`
 	MsgID     string `json:"msg_id"`
 }
 
-// ProcessIncomingMessageParams contains parameters for processing incoming messages with vendor detection
+// ProcessIncomingMessageParams contains parameters for processing incoming messages with partner detection
 type ProcessIncomingMessageParams struct {
 	ChannelID string                 `json:"channel_id" validate:"required"`
 	SenderID  string                 `json:"sender_id" validate:"required"`
 	Content   string                 `json:"content" validate:"required"`
 	CreatedAt int64                  `json:"created_at" validate:"required"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
-	Vendor    VendorInfo             `json:"vendor" validate:"required"`
+	Partner   Source                 `json:"partner" validate:"required"`
 }
 
 type OutgoingMessage struct {
-	ChannelID string     `json:"channel_id" validate:"required"`
-	SenderID  string     `json:"sender_id" validate:"required"`
-	Message   string     `json:"message" validate:"required"`
-	Vendor    VendorInfo `json:"vendor"`
+	ChannelID string `json:"channel_id" validate:"required"`
+	SenderID  string `json:"sender_id" validate:"required"`
+	Message   string `json:"message" validate:"required"`
+	Partner   Source `json:"partner"`
 }
 
 type ChannelInfo struct {

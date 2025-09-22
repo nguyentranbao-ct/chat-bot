@@ -1,4 +1,4 @@
-package vendors
+package partners
 
 import (
 	"context"
@@ -13,29 +13,29 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/list_products"
 )
 
-// ChototVendor implements the Vendor interface for Chotot platform
+// ChototPartner implements the Partner interface for Chotot platform
 // It combines both chat-api (Chotot's chat platform) and product services
-type ChototVendor struct {
+type ChototPartner struct {
 	chatClient    chatapi.Client
 	productClient chotot.Client
 }
 
-// NewChototVendor creates a new Chotot vendor instance
-func NewChototVendor(chatClient chatapi.Client, productClient chotot.Client) *ChototVendor {
-	return &ChototVendor{
+// NewChototPartner creates a new Chotot partner instance
+func NewChototPartner(chatClient chatapi.Client, productClient chotot.Client) *ChototPartner {
+	return &ChototPartner{
 		chatClient:    chatClient,
 		productClient: productClient,
 	}
 }
 
-// GetVendorType returns the vendor type
-func (v *ChototVendor) GetVendorType() VendorType {
-	return VendorTypeChotot
+// GetPartnerType returns the partner type
+func (v *ChototPartner) GetPartnerType() PartnerType {
+	return PartnerTypeChotot
 }
 
-// GetCapabilities returns the capabilities of the Chotot vendor
-func (v *ChototVendor) GetCapabilities() VendorCapabilities {
-	return VendorCapabilities{
+// GetCapabilities returns the capabilities of the Chotot partner
+func (v *ChototPartner) GetCapabilities() PartnerCapabilities {
+	return PartnerCapabilities{
 		CanListMessages:    true,
 		CanSendMessage:     true,
 		CanGetChannelInfo:  true,
@@ -45,65 +45,65 @@ func (v *ChototVendor) GetCapabilities() VendorCapabilities {
 }
 
 // GetUserInfo retrieves user information from Chotot (returns empty info for now)
-func (v *ChototVendor) GetUserInfo(ctx context.Context, userID string) (*VendorUserInfo, error) {
+func (v *ChototPartner) GetUserInfo(ctx context.Context, userID string) (*PartnerUserInfo, error) {
 	if userID == "" {
-		return nil, NewVendorError(VendorTypeChotot, "GetUserInfo", "user ID cannot be empty", nil)
+		return nil, NewPartnerError(PartnerTypeChotot, "GetUserInfo", "user ID cannot be empty", nil)
 	}
 
 	// For now, return empty user info as requested
 	// In the future, this could call Chotot user API to get user details
-	vendorUserInfo := &VendorUserInfo{
-		ID:         userID,
-		Name:       "", // Empty for now
-		Email:      "", // Empty for now
-		VendorType: VendorTypeChotot,
-		Metadata:   map[string]interface{}{},
-		IsActive:   true, // Default to active
+	partnerUserInfo := &PartnerUserInfo{
+		ID:          userID,
+		Name:        "", // Empty for now
+		Email:       "", // Empty for now
+		PartnerType: PartnerTypeChotot,
+		Metadata:    map[string]interface{}{},
+		IsActive:    true, // Default to active
 	}
 
-	return vendorUserInfo, nil
+	return partnerUserInfo, nil
 }
 
 // GetChannelInfo retrieves channel information from Chotot chat-api
-func (v *ChototVendor) GetChannelInfo(ctx context.Context, channelID string) (*VendorChannelInfo, error) {
+func (v *ChototPartner) GetChannelInfo(ctx context.Context, channelID string) (*PartnerChannelInfo, error) {
 	if channelID == "" {
-		return nil, NewVendorError(VendorTypeChotot, "GetChannelInfo", "channel ID cannot be empty", nil)
+		return nil, NewPartnerError(PartnerTypeChotot, "GetChannelInfo", "channel ID cannot be empty", nil)
 	}
 
 	channelInfo, err := v.chatClient.GetChannelInfo(ctx, channelID)
 	if err != nil {
-		return nil, NewVendorError(VendorTypeChotot, "GetChannelInfo", "failed to get channel info", err)
+		return nil, NewPartnerError(PartnerTypeChotot, "GetChannelInfo", "failed to get channel info", err)
 	}
 
-	// Convert to vendor channel info format
-	vendorChannelInfo := &VendorChannelInfo{
+	// Convert to partner channel info format
+	partnerChannelInfo := &PartnerChannelInfo{
 		ID:           channelInfo.ID,
 		Name:         channelInfo.Name,
 		Context:      channelInfo.Context,
 		Type:         "direct", // Default for Chotot channels
 		Participants: channelInfo.Participants,
-		VendorType:   VendorTypeChotot,
+		PartnerType:  PartnerTypeChotot,
 		Metadata: map[string]interface{}{
 			"item_name":  channelInfo.ItemName,
 			"item_price": channelInfo.ItemPrice,
 		},
 	}
 
-	return vendorChannelInfo, nil
+	return partnerChannelInfo, nil
 }
 
 // SendMessage sends a message through Chotot chat-api
-func (v *ChototVendor) SendMessage(ctx context.Context, params SendMessageParams) error {
+func (v *ChototPartner) SendMessage(ctx context.Context, params SendMessageParams) error {
 	if params.ChannelID == "" {
-		return NewVendorError(VendorTypeChotot, "SendMessage", "channel ID cannot be empty", nil)
+		return NewPartnerError(PartnerTypeChotot, "SendMessage", "channel ID cannot be empty", nil)
 	}
 
 	if params.SenderID == "" {
-		return NewVendorError(VendorTypeChotot, "SendMessage", "sender ID cannot be empty", nil)
+		return NewPartnerError(PartnerTypeChotot, "SendMessage", "sender ID cannot be empty", nil)
 	}
 
 	if params.Content == "" {
-		return NewVendorError(VendorTypeChotot, "SendMessage", "message content cannot be empty", nil)
+		return NewPartnerError(PartnerTypeChotot, "SendMessage", "message content cannot be empty", nil)
 	}
 
 	// Create outgoing message
@@ -115,16 +115,16 @@ func (v *ChototVendor) SendMessage(ctx context.Context, params SendMessageParams
 
 	// Send through chat-api
 	if err := v.chatClient.SendMessage(ctx, outgoingMsg); err != nil {
-		return NewVendorError(VendorTypeChotot, "SendMessage", "failed to send message", err)
+		return NewPartnerError(PartnerTypeChotot, "SendMessage", "failed to send message", err)
 	}
 
 	return nil
 }
 
 // GetUserProducts retrieves user products from Chotot product service
-func (v *ChototVendor) GetUserProducts(ctx context.Context, params UserProductsParams) (*UserProductsResult, error) {
+func (v *ChototPartner) GetUserProducts(ctx context.Context, params UserProductsParams) (*UserProductsResult, error) {
 	if params.UserID == "" {
-		return nil, NewVendorError(VendorTypeChotot, "GetUserProducts", "user ID cannot be empty", nil)
+		return nil, NewPartnerError(PartnerTypeChotot, "GetUserProducts", "user ID cannot be empty", nil)
 	}
 
 	// Set default pagination if not specified
@@ -140,7 +140,7 @@ func (v *ChototVendor) GetUserProducts(ctx context.Context, params UserProductsP
 	// Get products from Chotot product service
 	adsResponse, err := v.productClient.GetUserAds(ctx, params.UserID, limit, page)
 	if err != nil {
-		return nil, NewVendorError(VendorTypeChotot, "GetUserProducts", "failed to get user products", err)
+		return nil, NewPartnerError(PartnerTypeChotot, "GetUserProducts", "failed to get user products", err)
 	}
 
 	// Convert to list_products.Product format
@@ -168,7 +168,7 @@ func (v *ChototVendor) GetUserProducts(ctx context.Context, params UserProductsP
 }
 
 // HealthCheck performs a health check on both chat and product services
-func (v *ChototVendor) HealthCheck(ctx context.Context) error {
+func (v *ChototPartner) HealthCheck(ctx context.Context) error {
 	// Create a timeout context for health check
 	healthCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -180,7 +180,7 @@ func (v *ChototVendor) HealthCheck(ctx context.Context) error {
 	if err != nil {
 		// Check if it's a connection/timeout error vs expected "not found" error
 		if isConnectionError(err) {
-			return NewVendorError(VendorTypeChotot, "HealthCheck", "chat service unreachable", err)
+			return NewPartnerError(PartnerTypeChotot, "HealthCheck", "chat service unreachable", err)
 		}
 	}
 

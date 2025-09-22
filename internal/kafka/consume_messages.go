@@ -59,7 +59,7 @@ func StartConsumeMessages(
 				"channel_id", kafkaMessage.Data.ChannelID,
 				"sender_id", kafkaMessage.Data.SenderID)
 
-			// Transform Kafka message to our internal format with vendor detection
+			// Transform Kafka message to our internal format with partner detection
 			data := kafkaMessage.Data
 
 			// Use ChatUseCase.ProcessIncomingMessage for message storage and socket events

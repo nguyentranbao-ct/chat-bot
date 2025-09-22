@@ -12,6 +12,7 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chotot"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/internal_api"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
+	"github.com/nguyentranbao-ct/chat-bot/internal/repo/partners"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/socket"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/end_session"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/fetch_messages"
@@ -19,7 +20,6 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/purchase_intent"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/reply_message"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repo/vendors"
 	"github.com/nguyentranbao-ct/chat-bot/internal/server"
 	"github.com/nguyentranbao-ct/chat-bot/internal/setup"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
@@ -82,9 +82,9 @@ func Invoke(funcs ...any) *fx.App {
 			socket.NewClient,
 			internal_api.NewClient,
 
-			// Vendor System
-			vendors.NewVendorRegistry,
-			vendors.NewChototVendor,
+			// Partner System
+			partners.NewPartnerRegistry,
+			partners.NewChototPartner,
 
 			// Tools Manager
 			toolsmanager.NewToolsManager,
@@ -102,7 +102,7 @@ func Invoke(funcs ...any) *fx.App {
 		fx.Invoke(setup.SetupChatModes),
 		fx.Invoke(initializeProductServices),
 		fx.Invoke(initializeLLMTools),
-		fx.Invoke(initializeVendors),
+		fx.Invoke(initializePartners),
 		fx.Invoke(funcs...),
 	)
 }
@@ -157,17 +157,17 @@ func initializeLLMTools(
 	)
 }
 
-// initializeVendors registers all vendor implementations with the registry
-func initializeVendors(
+// initializePartners registers all partner implementations with the registry
+func initializePartners(
 	lc fx.Lifecycle,
-	registry *vendors.VendorRegistry,
-	chototVendor *vendors.ChototVendor,
+	registry *partners.PartnerRegistry,
+	chototPartner *partners.ChototPartner,
 ) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			// Register Chotot vendor
-			if err := registry.RegisterVendor(chototVendor); err != nil {
-				return fmt.Errorf("failed to register Chotot vendor: %w", err)
+			// Register Chotot partner
+			if err := registry.RegisterPartner(chototPartner); err != nil {
+				return fmt.Errorf("failed to register Chotot partner: %w", err)
 			}
 			return nil
 		},
