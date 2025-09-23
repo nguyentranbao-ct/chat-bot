@@ -105,27 +105,30 @@ const ChatPage: React.FC = () => {
 
     setUser(storedUser);
     loadRooms();
-
-    // Check if we should show partner attributes popup for new users
-    checkPartnerAttributes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, loadRooms]);
 
-  const checkPartnerAttributes = async () => {
-    try {
-      const attributes = await api.getPartnerAttributes();
-      const hasAnyAttribute = Object.values(attributes).some(value => value && value.trim() !== '');
+  // Check partner attributes only once when component mounts and user is set
+  useEffect(() => {
+    const checkPartnerAttributes = async () => {
+      try {
+        const attributes = await api.getPartnerAttributes();
+        const hasAnyAttribute = Object.values(attributes).some(value => value && value.trim() !== '');
 
-      if (!hasAnyAttribute) {
+        if (!hasAnyAttribute) {
+          setIsInitialSetup(true);
+          setShowPartnerModal(true);
+        }
+      } catch (err) {
+        // If we can't fetch attributes or they don't exist, show the modal
+        console.log('No partner attributes found, showing setup modal');
         setIsInitialSetup(true);
         setShowPartnerModal(true);
       }
-    } catch (err) {
-      // If we can't fetch attributes or they don't exist, show the modal
-      console.log('No partner attributes found, showing setup modal');
-      setIsInitialSetup(true);
-      setShowPartnerModal(true);
-    }
-  };
+    };
+
+    checkPartnerAttributes();
+  }, []);
 
   // Handle URL room parameter
   useEffect(() => {
@@ -135,7 +138,7 @@ const ChatPage: React.FC = () => {
         setSelectedRoom(room);
       }
     }
-  }, [roomId, rooms, selectedRoom]);
+  }, [roomId, rooms, selectedRoom,]);
 
   // Set up socket listeners - stable references to avoid re-renders
   useEffect(() => {
@@ -156,8 +159,9 @@ const ChatPage: React.FC = () => {
       setRooms(prev => {
         const existingRoomIndex = prev.findIndex(room => room.id === message.room_id);
         if (existingRoomIndex === -1) {
-          // This is genuinely a new room, but don't refresh immediately to avoid unnecessary calls
-          console.log('New channel detected, but skipping immediate refresh');
+          // This is genuinely a new room, refresh the room list to get it
+          console.log('New room detected, refreshing room list...');
+          loadRooms(true);
           return prev;
         }
 
@@ -223,7 +227,7 @@ const ChatPage: React.FC = () => {
         socket.offTypingStop(handleTypingStop);
       };
     }
-  }, [selectedRoom?.id, user?.id, socket]);
+  }, [selectedRoom?.id, user?.id, socket, loadRooms]);
 
   // Join/leave rooms when selection changes
   useEffect(() => {
@@ -245,6 +249,10 @@ const ChatPage: React.FC = () => {
   }, [selectedRoom, socket, loadMessages]);
 
   const handleRoomSelect = useCallback((room: Room) => {
+    if (selectedRoom?.id === room.id) {
+      return;
+    }
+
     setSelectedRoom(room);
     setMessages([]);
     setIsTyping(false);
@@ -258,7 +266,7 @@ const ChatPage: React.FC = () => {
 
     // Update URL to include room ID
     navigate(`/chat/${room.id}`);
-  }, [navigate]);
+  }, [navigate, selectedRoom]);
 
   const handleLogout = async () => {
     try {
@@ -370,12 +378,14 @@ const ChatPage: React.FC = () => {
       </div>
 
       {/* Partner Attributes Modal */}
-      <PartnerAttributesModal
-        isOpen={showPartnerModal}
-        onClose={handlePartnerModalClose}
-        showSkipOption={isInitialSetup}
-        title={isInitialSetup ? "Welcome! Set up your partner integrations" : "Partner Integration Settings"}
-      />
+      {showPartnerModal &&
+        <PartnerAttributesModal
+          isOpen={showPartnerModal}
+          onClose={handlePartnerModalClose}
+          showSkipOption={isInitialSetup}
+          title={isInitialSetup ? "Welcome! Set up your partner integrations" : "Partner Integration Settings"}
+        />
+      }
     </Layout>
   );
 };

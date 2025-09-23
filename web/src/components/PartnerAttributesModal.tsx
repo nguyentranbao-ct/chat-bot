@@ -76,11 +76,11 @@ export const PartnerAttributesModal: React.FC<PartnerAttributesModalProps> = ({
   };
 
   const handleCancel = () => {
-    if (showSkipOption) {
-      // If this is the initial setup popup, close the modal
+    if (showSkipOption || !isEditMode) {
+      // If this is the initial setup popup OR we're in read-only mode, close the modal
       onClose();
     } else {
-      // If this is from settings, just exit edit mode
+      // If this is from settings and we're in edit mode, just exit edit mode
       setIsEditMode(false);
       setError('');
     }

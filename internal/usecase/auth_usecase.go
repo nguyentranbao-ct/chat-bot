@@ -38,10 +38,11 @@ func (uc *AuthUseCase) Login(ctx context.Context, req models.LoginRequest, userA
 		if errors.Is(err, models.ErrNotFound) {
 			// Create new user if not exists
 			user = &models.User{
-				Email:     req.Email,
-				IsActive:  true,
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				Email:      req.Email,
+				IsActive:   true,
+				CreatedAt:  time.Now(),
+				UpdatedAt:  time.Now(),
+				IsInternal: true,
 			}
 			if err := uc.userRepo.Create(ctx, user); err != nil {
 				return nil, fmt.Errorf("failed to create user: %w", err)

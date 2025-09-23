@@ -251,6 +251,45 @@ export const PartnerAttributesForm: React.FC<PartnerAttributesFormProps> = ({
               <div className="text-sm text-gray-500">
                 Connect with Chotot marketplace for product listings
               </div>
+
+              {/* Chotot Fields */}
+              {selectedPartners.chotot && (
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <label htmlFor="chotot_id" className="block text-sm font-medium text-gray-700 mb-1">
+                      Chotot ID
+                    </label>
+                    <input
+                      type="text"
+                      id="chotot_id"
+                      value={formData.chotot_id}
+                      onChange={(e) => handleInputChange('chotot_id', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter your Chotot ID"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="chotot_oid" className="block text-sm font-medium text-gray-700 mb-1">
+                      Chotot OID
+                    </label>
+                    <input
+                      type="text"
+                      id="chotot_oid"
+                      value={formData.chotot_oid}
+                      onChange={(e) => handleInputChange('chotot_oid', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter your Chotot OID"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+
+                  {errors.chotot && (
+                    <p className="text-sm text-red-600">{errors.chotot}</p>
+                  )}
+                </div>
+              )}
             </div>
           </label>
         </div>
@@ -271,93 +310,54 @@ export const PartnerAttributesForm: React.FC<PartnerAttributesFormProps> = ({
               <div className="text-sm text-gray-500">
                 Enable WhatsApp messaging for customer communication
               </div>
+
+              {/* WhatsApp Fields */}
+              {selectedPartners.whatsapp && (
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <label htmlFor="whatsapp_phone_number_id" className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone Number ID <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="whatsapp_phone_number_id"
+                      value={formData.whatsapp_phone_number_id}
+                      onChange={(e) => handleInputChange('whatsapp_phone_number_id', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter Phone Number ID"
+                      required
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="whatsapp_system_token" className="block text-sm font-medium text-gray-700 mb-1">
+                      System Token <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      id="whatsapp_system_token"
+                      value={formData.whatsapp_system_token}
+                      onChange={(e) => handleInputChange('whatsapp_system_token', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter System Token"
+                      required
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      This token will be encrypted and stored securely
+                    </p>
+                  </div>
+
+                  {errors.whatsapp && (
+                    <p className="text-sm text-red-600">{errors.whatsapp}</p>
+                  )}
+                </div>
+              )}
             </div>
           </label>
         </div>
       </div>
-
-      {/* Chotot Fields */}
-      {selectedPartners.chotot && (
-        <div className="border border-gray-200 rounded-lg p-4 space-y-3">
-          <h4 className="font-medium text-gray-900">Chotot Configuration</h4>
-
-          <div>
-            <label htmlFor="chotot_id" className="block text-sm font-medium text-gray-700 mb-1">
-              Chotot ID
-            </label>
-            <input
-              type="text"
-              id="chotot_id"
-              value={formData.chotot_id}
-              onChange={(e) => handleInputChange('chotot_id', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter your Chotot ID"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="chotot_oid" className="block text-sm font-medium text-gray-700 mb-1">
-              Chotot OID
-            </label>
-            <input
-              type="text"
-              id="chotot_oid"
-              value={formData.chotot_oid}
-              onChange={(e) => handleInputChange('chotot_oid', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter your Chotot OID"
-            />
-          </div>
-
-          {errors.chotot && (
-            <p className="text-sm text-red-600">{errors.chotot}</p>
-          )}
-        </div>
-      )}
-
-      {/* WhatsApp Fields */}
-      {selectedPartners.whatsapp && (
-        <div className="border border-gray-200 rounded-lg p-4 space-y-3">
-          <h4 className="font-medium text-gray-900">WhatsApp Business Configuration</h4>
-
-          <div>
-            <label htmlFor="whatsapp_phone_number_id" className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number ID <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              id="whatsapp_phone_number_id"
-              value={formData.whatsapp_phone_number_id}
-              onChange={(e) => handleInputChange('whatsapp_phone_number_id', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter Phone Number ID"
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="whatsapp_system_token" className="block text-sm font-medium text-gray-700 mb-1">
-              System Token <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="password"
-              id="whatsapp_system_token"
-              value={formData.whatsapp_system_token}
-              onChange={(e) => handleInputChange('whatsapp_system_token', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter System Token"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              This token will be encrypted and stored securely
-            </p>
-          </div>
-
-          {errors.whatsapp && (
-            <p className="text-sm text-red-600">{errors.whatsapp}</p>
-          )}
-        </div>
-      )}
 
       {/* Actions */}
       <div className="flex justify-end space-x-3 pt-4">
