@@ -248,32 +248,17 @@ func (r *roomMemberRepo) IncrementUnreadCountAndUpdateLastMessage(ctx context.Co
 	// Single query to increment unread count for others and update last message for all room members
 	// Use MongoDB's bulkWrite for atomic operations on different filter conditions
 	models := []mongo.WriteModel{
-		// Increment unread count for others (exclude sender)
+		// Increment unread count for all members.
+		// In case automation messages was sent, we also notify the sender for new msg.
 		mongo.NewUpdateManyModel().
 			SetFilter(bson.M{
 				"room_id": roomID,
-				"user_id": bson.M{"$ne": message.SenderID},
 			}).
 			SetUpdate(bson.M{
 				"$inc": bson.M{"unread_count": 1},
 				"$set": bson.M{
 					"last_message_at":      now,
 					"last_message_content": message.Content,
-					"updated_at":           now,
-				},
-			}),
-		// Update last message for sender and reset unread count
-		mongo.NewUpdateOneModel().
-			SetFilter(bson.M{
-				"room_id": roomID,
-				"user_id": message.SenderID,
-			}).
-			SetUpdate(bson.M{
-				"$set": bson.M{
-					"unread_count":         0,
-					"last_message_at":      now,
-					"last_message_content": message.Content,
-					"last_read_at":         now,
 					"updated_at":           now,
 				},
 			}),

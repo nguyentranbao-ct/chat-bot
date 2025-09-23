@@ -172,8 +172,7 @@ const ChatPage: React.FC = () => {
               ...room,
               last_message_at: message.created_at,
               last_message_content: message.content,
-              unread_count: selectedRoom?.id === message.room_id ||
-                message.sender_id === user?.id ?
+              unread_count: selectedRoom?.id === message.room_id ?
                 0 : room.unread_count + 1
             }
             : room
