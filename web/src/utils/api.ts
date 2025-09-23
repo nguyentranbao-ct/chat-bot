@@ -133,10 +133,8 @@ class ApiClient {
     return response.data;
   }
 
-  async markAsRead(roomId: string, lastReadMessageId: string): Promise<void> {
-    await this.client.post(`/chat/rooms/${roomId}/read`, {
-      message_id: lastReadMessageId,
-    });
+  async markAsRead(roomId: string): Promise<void> {
+    await this.client.post(`/chat/rooms/${roomId}/read`);
   }
 
   async setTyping(roomId: string, isTyping: boolean): Promise<void> {

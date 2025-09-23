@@ -8,7 +8,7 @@ interface ChatWindowProps {
   messages: ChatMessage[];
   currentUserId: string;
   onSendMessage: (message: SendMessageRequest) => void;
-  onMarkAsRead: (messageId: string) => void;
+  onMarkAsRead: (message: ChatMessage) => void;
   isTyping?: boolean;
 }
 
@@ -22,24 +22,44 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const previousMessagesLength = useRef<number>(0);
+  const isInitialLoad = useRef<boolean>(true);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (smooth = false) => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: smooth ? 'smooth' : 'auto'
+    });
   };
 
   useEffect(() => {
-    scrollToBottom();
+    const currentLength = messages.length;
+    const wasEmpty = previousMessagesLength.current === 0;
+
+    if (wasEmpty || isInitialLoad.current) {
+      // Instant scroll on room open or initial load
+      scrollToBottom(false);
+      isInitialLoad.current = false;
+    } else if (currentLength > previousMessagesLength.current) {
+      // Smooth scroll on new messages
+      scrollToBottom(true);
+    }
+
+    previousMessagesLength.current = currentLength;
   }, [messages]);
+
+  // Reset initial load flag when room changes
+  useEffect(() => {
+    isInitialLoad.current = true;
+    previousMessagesLength.current = 0;
+  }, [room.id]);
 
   // Mark last message as read when component mounts or messages change
   useEffect(() => {
     if (messages && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
-      if (lastMessage.sender_id !== currentUserId) {
-        onMarkAsRead(lastMessage.id);
-      }
+      onMarkAsRead(lastMessage);
     }
-  }, [messages, currentUserId, onMarkAsRead]);
+  }, [messages, onMarkAsRead]);
 
   const formatMessageTime = (timestamp: string) => {
     const date = new Date(timestamp);

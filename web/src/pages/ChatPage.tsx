@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import ConversationList from '../components/ConversationList';
@@ -28,10 +28,18 @@ const ChatPage: React.FC = () => {
   const [error, setError] = useState('');
 
   // Define callback functions first
+  // Prevent redundant reloads when navigating between room routes that remount the component
+  const roomsLoadedRef = useRef(false);
   const loadRooms = useCallback(async (forceRefresh = false) => {
+    if (roomsLoadedRef.current && !forceRefresh) {
+      // Already loaded once and no forced refresh requested
+      setIsLoading(false);
+      return;
+    }
     try {
       const roomData = await api.getRooms();
       setRooms(roomData || []);
+      roomsLoadedRef.current = true;
     } catch (err: any) {
       console.error('Failed to load rooms:', err);
       setError('Failed to load conversations');
@@ -40,10 +48,6 @@ const ChatPage: React.FC = () => {
     }
   }, []);
 
-  // Check if a room exists locally before refreshing
-  const findRoomById = useCallback((roomId: string) => {
-    return rooms.find(room => room.id === roomId);
-  }, [rooms]);
 
   const loadMessages = useCallback(async (roomId: string) => {
     try {
@@ -73,11 +77,15 @@ const ChatPage: React.FC = () => {
     }
   }, [selectedRoom, user]);
 
-  const handleMarkAsRead = useCallback(async (messageId: string) => {
+  const handleMarkAsRead = useCallback(async (message: ChatMessage) => {
     if (!selectedRoom) return;
 
     try {
-      await api.markAsRead(selectedRoom.id, messageId);
+      if (selectedRoom.last_read_at && new Date(message.created_at) <= new Date(selectedRoom.last_read_at)) {
+        // Already marked as read
+        return;
+      }
+      await api.markAsRead(selectedRoom.id);
     } catch (err: any) {
       console.error('Failed to mark as read:', err);
     }
@@ -93,7 +101,7 @@ const ChatPage: React.FC = () => {
 
     setUser(storedUser);
     loadRooms();
-  }, [navigate, loadRooms]);
+  }, [navigate]);
 
   // Handle URL room parameter
   useEffect(() => {
@@ -120,24 +128,29 @@ const ChatPage: React.FC = () => {
         return prev;
       });
 
-      // Optimized refresh logic: only refresh if this is a new channel
-      const existingRoom = findRoomById(message.room_id);
-      if (!existingRoom) {
-        // This is a new channel, refresh the entire list
-        console.log('New channel detected, refreshing room list');
-        loadRooms(true);
-      } else {
-        // Update last message info for existing room without full refresh
-        setRooms(prev => prev.map(room =>
+      // Update room info without calling API - we already have the data
+      setRooms(prev => {
+        const existingRoomIndex = prev.findIndex(room => room.id === message.room_id);
+        if (existingRoomIndex === -1) {
+          // This is genuinely a new room, but don't refresh immediately to avoid unnecessary calls
+          console.log('New channel detected, but skipping immediate refresh');
+          return prev;
+        }
+
+        // Update existing room
+        return prev.map(room =>
           room.id === message.room_id
             ? {
-                ...room,
-                last_message_at: message.created_at,
-                unread_count: selectedRoom?.id === message.room_id ? 0 : room.unread_count + 1
-              }
+              ...room,
+              last_message_at: message.created_at,
+              last_message_content: message.content,
+              unread_count: selectedRoom?.id === message.room_id ||
+                message.sender_id === user?.id ?
+                0 : room.unread_count + 1
+            }
             : room
-        ));
-      }
+        );
+      });
     };
 
     const handleMessageSent = (message: ChatMessage) => {
@@ -186,7 +199,7 @@ const ChatPage: React.FC = () => {
         socket.offTypingStop(handleTypingStop);
       };
     }
-  }, [selectedRoom?.id, user?.id, socket.isConnected, findRoomById, loadRooms]);
+  }, [selectedRoom?.id, user?.id, socket.isConnected]);
 
   // Join/leave rooms when selection changes
   useEffect(() => {
@@ -211,6 +224,14 @@ const ChatPage: React.FC = () => {
     setSelectedRoom(room);
     setMessages([]);
     setIsTyping(false);
+
+    // Immediately clear unread count in local state
+    if (room.unread_count > 0) {
+      setRooms(prev => prev.map(r =>
+        r.id === room.id ? { ...r, unread_count: 0 } : r
+      ));
+    }
+
     // Update URL to include room ID
     navigate(`/chat/${room.id}`);
   }, [navigate]);

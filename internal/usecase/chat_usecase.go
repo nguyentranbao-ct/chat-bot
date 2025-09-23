@@ -112,8 +112,8 @@ func (uc *ChatUseCase) postProcessSentMessage(ctx context.Context, message *mode
 	ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
 	defer cancel()
 
-	// Increment unread count for other members
-	uc.incrementUnreadCountForOthers(ctx, params.RoomID, params.SenderID)
+	// Increment unread count for other members and update last message in a single optimized query
+	uc.incrementUnreadCountAndUpdateLastMessage(ctx, message, params.RoomID)
 
 	// Create message event for real-time sync
 	uc.createMessageSentEvent(ctx, message, params)
@@ -125,9 +125,6 @@ func (uc *ChatUseCase) postProcessSentMessage(ctx context.Context, message *mode
 	if !params.SkipPartner {
 		uc.sendToExternalPartner(ctx, message, params, roomMembers)
 	}
-
-	// Update room last message time for all members in this room
-	uc.updateLastMessageForRoomMembers(ctx, params.RoomID, params.Content)
 }
 
 // broadcastSentMessage broadcasts the sent message to all room members via socket
@@ -221,13 +218,6 @@ func (uc *ChatUseCase) getSenderRoomMember(ctx context.Context, roomID primitive
 	return uc.roomMemberRepo.GetMemberByRoomID(ctx, roomID, userID)
 }
 
-// updateLastMessageForRoomMembers updates last message info for all members in a room
-func (uc *ChatUseCase) updateLastMessageForRoomMembers(ctx context.Context, roomID primitive.ObjectID, content string) {
-	if err := uc.roomMemberRepo.UpdateLastMessageForRoom(ctx, roomID, content); err != nil {
-		log.Warnw(ctx, "Failed to update last message for room members", "error", err)
-	}
-}
-
 // createMessageSentEvent creates a real-time event for the sent message
 func (uc *ChatUseCase) createMessageSentEvent(ctx context.Context, message *models.ChatMessage, params SendMessageParams) {
 	eventParams := mongodb.CreateEventParams{
@@ -253,8 +243,8 @@ func (uc *ChatUseCase) GetRoomEvents(ctx context.Context, roomID primitive.Objec
 	return uc.messageEventRepo.GetRoomEvents(ctx, roomID, sinceTime)
 }
 
-func (uc *ChatUseCase) MarkAsRead(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error {
-	return uc.roomMemberRepo.MarkAsReadByRoomID(ctx, roomID, userID, lastReadMessageID)
+func (uc *ChatUseCase) MarkAsRead(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID) error {
+	return uc.roomMemberRepo.MarkAsReadByRoomID(ctx, roomID, userID)
 }
 
 func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage models.KafkaMessageData) error {
@@ -304,11 +294,7 @@ func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage 
 		roomMembers = nil
 	}
 
-	// Post-process the incoming message
 	go uc.postProcessIncomingMessage(ctx, message, roomMember, partnerType, roomMembers)
-
-	// Update room last message time synchronously
-	uc.updateLastMessageForRoomMembers(ctx, roomMember.RoomID, kafkaMessage.Message)
 
 	return nil
 }
@@ -317,8 +303,10 @@ func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage 
 func (uc *ChatUseCase) postProcessIncomingMessage(ctx context.Context, message *models.ChatMessage, roomMember *models.RoomMember, partnerType partners.PartnerType, roomMembers []*models.RoomMember) {
 	ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
 	defer cancel()
-	// Increment unread count for all members except sender
-	uc.incrementUnreadCountForOthers(ctx, roomMember.RoomID, message.SenderID)
+
+	// Post-process the incoming message
+	// Update room last message time and increment unread count synchronously for better consistency
+	uc.incrementUnreadCountAndUpdateLastMessage(ctx, message, roomMember.RoomID)
 
 	// Create message event for real-time sync
 	uc.createMessageReceivedEvent(ctx, message, roomMember)
@@ -429,16 +417,10 @@ func (uc *ChatUseCase) findOrCreateRoom(ctx context.Context, roomID string, part
 	return members[0], nil
 }
 
-func (uc *ChatUseCase) incrementUnreadCountForOthers(ctx context.Context, roomID primitive.ObjectID, senderID primitive.ObjectID) {
-	if err := uc.roomMemberRepo.IncrementUnreadCountByRoomID(ctx, roomID, senderID); err != nil {
-		fmt.Printf("Failed to increment unread count for room members: %v\n", err)
-	}
-}
-
 // incrementUnreadCountAndUpdateLastMessage efficiently handles both operations in a single MongoDB query
-func (uc *ChatUseCase) incrementUnreadCountAndUpdateLastMessage(ctx context.Context, roomID primitive.ObjectID, senderID primitive.ObjectID, content string) {
-	if err := uc.roomMemberRepo.IncrementUnreadCountAndUpdateLastMessage(ctx, roomID, senderID, content); err != nil {
-		fmt.Printf("Failed to increment unread count and update last message for room members: %v\n", err)
+func (uc *ChatUseCase) incrementUnreadCountAndUpdateLastMessage(ctx context.Context, message *models.ChatMessage, roomID primitive.ObjectID) {
+	if err := uc.roomMemberRepo.IncrementUnreadCountAndUpdateLastMessage(ctx, message, roomID); err != nil {
+		log.Errorw(ctx, "Failed to update read/unread", "room_id", roomID, "sender_id", message, "error", err)
 	}
 }
 

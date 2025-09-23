@@ -39,6 +39,7 @@ export interface Room {
   type: string;
   created_at: string;
   updated_at: string;
+  last_read_at?: string;
   last_message_at?: string;
   last_message_content: string;
   is_archived: boolean;

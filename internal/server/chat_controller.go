@@ -208,10 +208,6 @@ func (cc *chatController) GetRoomMessages(c echo.Context) error {
 	return c.JSON(http.StatusOK, messages)
 }
 
-type MarkAsReadRequest struct {
-	MessageID string `json:"message_id" validate:"required"`
-}
-
 func (cc *chatController) MarkAsRead(c echo.Context) error {
 	user := c.Get("user").(*models.User)
 
@@ -221,22 +217,8 @@ func (cc *chatController) MarkAsRead(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid room ID")
 	}
 
-	var req MarkAsReadRequest
-	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
-	}
-
-	if err := c.Validate(req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-
-	messageID, err := primitive.ObjectIDFromHex(req.MessageID)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid message ID")
-	}
-
 	ctx := c.Request().Context()
-	if err := cc.chatUsecase.MarkAsRead(ctx, roomID, user.ID, messageID); err != nil {
+	if err := cc.chatUsecase.MarkAsRead(ctx, roomID, user.ID); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 

@@ -68,7 +68,6 @@ func (r *userRepo) GetByEmail(ctx context.Context, email string) (*models.User, 
 	return &user, nil
 }
 
-
 func (r *userRepo) Update(ctx context.Context, user *models.User) error {
 	user.UpdatedAt = time.Now()
 

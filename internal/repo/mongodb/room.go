@@ -26,7 +26,6 @@ type ParticipantInfo struct {
 	Role   string
 }
 
-
 type RoomMemberRepository interface {
 	Create(ctx context.Context, member *models.RoomMember) error
 	GetRoomMembers(ctx context.Context, source models.RoomPartner) ([]*models.RoomMember, error)
@@ -37,9 +36,8 @@ type RoomMemberRepository interface {
 	FindOrCreateRoom(ctx context.Context, source models.RoomPartner, roomInfo RoomInfo, participants []ParticipantInfo) error
 	IncrementUnreadCountByRoomID(ctx context.Context, roomID primitive.ObjectID, excludeUserID primitive.ObjectID) error
 	IncrementUnreadCount(ctx context.Context, source models.RoomPartner, excludeUserID primitive.ObjectID) error
-	IncrementUnreadCountAndUpdateLastMessage(ctx context.Context, roomID primitive.ObjectID, excludeUserID primitive.ObjectID, content string) error
-	MarkAsRead(ctx context.Context, userID primitive.ObjectID, source models.RoomPartner, lastReadMessageID primitive.ObjectID) error
-	MarkAsReadByRoomID(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error
+	IncrementUnreadCountAndUpdateLastMessage(ctx context.Context, message *models.ChatMessage, roomID primitive.ObjectID) error
+	MarkAsReadByRoomID(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID) error
 	UpdateLastMessageForRoom(ctx context.Context, roomID primitive.ObjectID, content string) error
 }
 
@@ -213,24 +211,6 @@ func (r *roomMemberRepo) IncrementUnreadCount(ctx context.Context, source models
 	return err
 }
 
-func (r *roomMemberRepo) MarkAsRead(ctx context.Context, userID primitive.ObjectID, source models.RoomPartner, lastReadMessageID primitive.ObjectID) error {
-	filter := bson.M{
-		"user_id":        userID,
-		"source.name":    source.Name,
-		"source.room_id": source.RoomID,
-	}
-	update := bson.M{
-		"$set": bson.M{
-			"unread_count": 0,
-			"last_read_at": time.Now(),
-			"updated_at":   time.Now(),
-		},
-	}
-
-	_, err := r.collection.UpdateOne(ctx, filter, update)
-	return err
-}
-
 func (r *roomMemberRepo) IncrementUnreadCountByRoomID(ctx context.Context, roomID primitive.ObjectID, excludeUserID primitive.ObjectID) error {
 	filter := bson.M{
 		"room_id": roomID,
@@ -245,7 +225,7 @@ func (r *roomMemberRepo) IncrementUnreadCountByRoomID(ctx context.Context, roomI
 	return err
 }
 
-func (r *roomMemberRepo) MarkAsReadByRoomID(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error {
+func (r *roomMemberRepo) MarkAsReadByRoomID(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID) error {
 	filter := bson.M{
 		"room_id": roomID,
 		"user_id": userID,
@@ -262,7 +242,7 @@ func (r *roomMemberRepo) MarkAsReadByRoomID(ctx context.Context, roomID primitiv
 	return err
 }
 
-func (r *roomMemberRepo) IncrementUnreadCountAndUpdateLastMessage(ctx context.Context, roomID primitive.ObjectID, excludeUserID primitive.ObjectID, content string) error {
+func (r *roomMemberRepo) IncrementUnreadCountAndUpdateLastMessage(ctx context.Context, message *models.ChatMessage, roomID primitive.ObjectID) error {
 	now := time.Now()
 
 	// Single query to increment unread count for others and update last message for all room members
@@ -272,26 +252,28 @@ func (r *roomMemberRepo) IncrementUnreadCountAndUpdateLastMessage(ctx context.Co
 		mongo.NewUpdateManyModel().
 			SetFilter(bson.M{
 				"room_id": roomID,
-				"user_id": bson.M{"$ne": excludeUserID},
+				"user_id": bson.M{"$ne": message.SenderID},
 			}).
 			SetUpdate(bson.M{
 				"$inc": bson.M{"unread_count": 1},
 				"$set": bson.M{
 					"last_message_at":      now,
-					"last_message_content": content,
+					"last_message_content": message.Content,
 					"updated_at":           now,
 				},
 			}),
-		// Update last message for sender (without incrementing unread count)
+		// Update last message for sender and reset unread count
 		mongo.NewUpdateOneModel().
 			SetFilter(bson.M{
 				"room_id": roomID,
-				"user_id": excludeUserID,
+				"user_id": message.SenderID,
 			}).
 			SetUpdate(bson.M{
 				"$set": bson.M{
+					"unread_count":         0,
 					"last_message_at":      now,
-					"last_message_content": content,
+					"last_message_content": message.Content,
+					"last_read_at":         now,
 					"updated_at":           now,
 				},
 			}),
@@ -314,4 +296,3 @@ func (r *roomMemberRepo) UpdateLastMessageForRoom(ctx context.Context, roomID pr
 	_, err := r.collection.UpdateMany(ctx, filter, update)
 	return err
 }
-

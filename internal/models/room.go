@@ -46,6 +46,7 @@ type Room struct {
 	Context            string     `json:"context,omitempty"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
+	LastReadAt         *time.Time `json:"last_read_at,omitempty"`
 	LastMessageAt      *time.Time `json:"last_message_at,omitempty"`
 	LastMessageContent string     `json:"last_message_content"`
 	IsArchived         bool       `json:"is_archived"`
@@ -68,6 +69,11 @@ func (rm *RoomMember) ToRoom() *Room {
 	// Set last message time if available
 	if !rm.LastMessageAt.IsZero() {
 		room.LastMessageAt = &rm.LastMessageAt
+	}
+
+	// Set last read time if available
+	if !rm.LastReadAt.IsZero() {
+		room.LastReadAt = &rm.LastReadAt
 	}
 
 	// Extract item info from metadata
