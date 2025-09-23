@@ -6,7 +6,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-
 type RoomMember struct {
 	// Member identity
 	ID     primitive.ObjectID `bson:"_id,omitempty" json:"id"`
@@ -40,32 +39,30 @@ type RoomPartner struct {
 
 // Room represents the client-side view of a room (converted from RoomMember)
 type Room struct {
-	ID             string    `json:"id"`
-	ExternalRoomID string    `json:"external_room_id"`
-	Name           string    `json:"name"`
-	ItemName       string    `json:"item_name,omitempty"`
-	ItemPrice      string    `json:"item_price,omitempty"`
-	Context        string    `json:"context,omitempty"`
-	Type           string    `json:"type"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	LastMessageAt  *time.Time `json:"last_message_at,omitempty"`
-	IsArchived     bool      `json:"is_archived"`
-	UnreadCount    int       `json:"unread_count"`
+	ID                 string     `json:"id"`
+	Name               string     `json:"name"`
+	ItemName           string     `json:"item_name,omitempty"`
+	ItemPrice          string     `json:"item_price,omitempty"`
+	Context            string     `json:"context,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	LastMessageAt      *time.Time `json:"last_message_at,omitempty"`
+	LastMessageContent string     `json:"last_message_content"`
+	IsArchived         bool       `json:"is_archived"`
+	UnreadCount        int        `json:"unread_count"`
 }
 
 // ToRoom converts a RoomMember to a client-facing Room
 func (rm *RoomMember) ToRoom() *Room {
 	room := &Room{
-		ID:             rm.RoomID.Hex(),
-		ExternalRoomID: rm.Source.RoomID,
-		Name:           rm.RoomName,
-		Context:        rm.RoomContext,
-		Type:           "chat", // default type
-		CreatedAt:      rm.CreatedAt,
-		UpdatedAt:      rm.UpdatedAt,
-		IsArchived:     false, // default value
-		UnreadCount:    rm.UnreadCount,
+		ID:                 rm.RoomID.Hex(),
+		Name:               rm.RoomName,
+		Context:            rm.RoomContext,
+		CreatedAt:          rm.CreatedAt,
+		UpdatedAt:          rm.UpdatedAt,
+		IsArchived:         false, // default value
+		UnreadCount:        rm.UnreadCount,
+		LastMessageContent: rm.LastMessageContent,
 	}
 
 	// Set last message time if available
@@ -88,9 +85,9 @@ func (rm *RoomMember) ToRoom() *Room {
 
 // RoomMemberInfo represents basic room member information for clients
 type RoomMemberInfo struct {
-	ID       string `json:"id"`
-	UserID   string `json:"user_id"`
-	Role     string `json:"role"`
+	ID       string    `json:"id"`
+	UserID   string    `json:"user_id"`
+	Role     string    `json:"role"`
 	JoinedAt time.Time `json:"joined_at"`
 }
 
@@ -103,4 +100,3 @@ func (rm *RoomMember) ToRoomMemberInfo() *RoomMemberInfo {
 		JoinedAt: rm.JoinedAt,
 	}
 }
-

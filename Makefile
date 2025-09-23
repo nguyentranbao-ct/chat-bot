@@ -1,20 +1,18 @@
 # Run tests
 test:
-	@echo "Running tests..."
 	go test -v -race -coverprofile=coverage.out ./...
 
 # Run tests with coverage report
 test-coverage: test
-	@echo "Generating coverage report..."
 	go tool cover -html=coverage.out -o coverage.html
 
 # Run linter
 lint:
-	golangci-lint run --new-from-rev origin/main
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.5 run --new-from-rev origin/main
 
 # Generate mocks
 mock:
-	mockery --all --output=./internal/mocks --case=underscore
+	go run github.com/vektra/mockery/v3@v3.5
 
 # Format code
 fmt:
@@ -35,22 +33,12 @@ dev:
 web-dev:
 	cd web && npm start
 
-# Install development tools
-install-tools:
-	@echo "Installing development tools..."
-	go install github.com/vektra/mockery/v3@latest
-	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+socket-dev:
+	cd socket && pnpm dev
 
 # Database commands (for development)
 db-up:
-	@echo "Starting MongoDB with Docker Compose..."
 	docker compose up -d mongodb
 
 db-down:
-	@echo "Stopping MongoDB..."
 	docker compose down
-
-# Full development setup
-setup: tidy install-tools
-	@echo "Development environment setup complete!"
-

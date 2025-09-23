@@ -63,7 +63,7 @@ func SetupRooms(userRepo mongodb.UserRepository, roomMemberRepo mongodb.RoomMemb
 		// Create room member for the owner using the new enhanced structure
 		member := &models.RoomMember{
 			UserID: ownerUser.ID,
-			Role:   "seller",
+			Role:   "merchant",
 
 			// Room information (denormalized)
 			Source:      source,

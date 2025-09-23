@@ -93,14 +93,22 @@ func (uc *ChatUseCase) SendMessage(ctx context.Context, params SendMessageParams
 		return nil, fmt.Errorf("failed to create message: %w", err)
 	}
 
+	// Get room members for post-processing (load once, reuse in all processes)
+	roomMembers, err := uc.roomMemberRepo.GetRoomMembersByRoomID(ctx, params.RoomID)
+	if err != nil {
+		log.Warnw(ctx, "Failed to get room members for post-processing", "error", err, "room_id", params.RoomID)
+		// Continue without room members data
+		roomMembers = nil
+	}
+
 	// Post-process the sent message
-	go uc.postProcessSentMessage(ctx, message, params)
+	go uc.postProcessSentMessage(ctx, message, params, roomMembers)
 
 	return message, nil
 }
 
 // postProcessSentMessage handles all post-processing after a message is sent
-func (uc *ChatUseCase) postProcessSentMessage(ctx context.Context, message *models.ChatMessage, params SendMessageParams) {
+func (uc *ChatUseCase) postProcessSentMessage(ctx context.Context, message *models.ChatMessage, params SendMessageParams, roomMembers []*models.RoomMember) {
 	ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
 	defer cancel()
 
@@ -110,29 +118,58 @@ func (uc *ChatUseCase) postProcessSentMessage(ctx context.Context, message *mode
 	// Create message event for real-time sync
 	uc.createMessageSentEvent(ctx, message, params)
 
+	// Broadcast message to all room members via socket
+	uc.broadcastSentMessage(ctx, message, roomMembers)
+
 	// Send to external partner asynchronously, unless skipped
 	if !params.SkipPartner {
-		uc.sendToExternalPartner(ctx, message, params)
+		uc.sendToExternalPartner(ctx, message, params, roomMembers)
 	}
 
 	// Update room last message time for all members in this room
 	uc.updateLastMessageForRoomMembers(ctx, params.RoomID, params.Content)
 }
 
+// broadcastSentMessage broadcasts the sent message to all room members via socket
+func (uc *ChatUseCase) broadcastSentMessage(ctx context.Context, message *models.ChatMessage, roomMembers []*models.RoomMember) {
+	if uc.socketHandler == nil || roomMembers == nil {
+		return
+	}
+
+	userIDs := make([]string, 0, len(roomMembers))
+	for _, member := range roomMembers {
+		userIDs = append(userIDs, member.UserID.Hex())
+	}
+
+	uc.socketHandler.BroadcastMessageToUsers(userIDs, message)
+}
+
 // sendToExternalPartner sends the message to the external partner
-func (uc *ChatUseCase) sendToExternalPartner(ctx context.Context, message *models.ChatMessage, params SendMessageParams) {
+func (uc *ChatUseCase) sendToExternalPartner(ctx context.Context, message *models.ChatMessage, params SendMessageParams, roomMembers []*models.RoomMember) {
 	timeoutCtx, cancel := util.NewTimeoutContext(ctx, 15*time.Second)
 	defer cancel()
 
-	// Get sender's room member info to get source information
-	senderMember, err := uc.getSenderRoomMember(ctx, params.RoomID, params.SenderID)
-	if err != nil {
-		log.Errorw(timeoutCtx, "Failed to get sender room member info",
-			"room_id", params.RoomID,
-			"sender_id", params.SenderID,
-			"error", err)
-		uc.chatMessageRepo.UpdateDeliveryStatus(timeoutCtx, message.ID, "failed")
-		return
+	// Get sender's room member info from the provided roomMembers to get source information
+	var senderMember *models.RoomMember
+	for _, member := range roomMembers {
+		if member.UserID == params.SenderID {
+			senderMember = member
+			break
+		}
+	}
+
+	// Fallback to database lookup if not found in provided members
+	if senderMember == nil {
+		var err error
+		senderMember, err = uc.getSenderRoomMember(ctx, params.RoomID, params.SenderID)
+		if err != nil {
+			log.Errorw(timeoutCtx, "Failed to get sender room member info",
+				"room_id", params.RoomID,
+				"sender_id", params.SenderID,
+				"error", err)
+			uc.chatMessageRepo.UpdateDeliveryStatus(timeoutCtx, message.ID, "failed")
+			return
+		}
 	}
 
 	// Get partner instance
@@ -259,8 +296,16 @@ func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage 
 		return fmt.Errorf("failed to upsert message: %w", err)
 	}
 
+	// Get room members for post-processing (load once, reuse in all processes)
+	roomMembers, err := uc.roomMemberRepo.GetRoomMembersByRoomID(ctx, roomMember.RoomID)
+	if err != nil {
+		log.Warnw(ctx, "Failed to get room members for post-processing", "error", err, "room_id", roomMember.RoomID)
+		// Continue without room members data
+		roomMembers = nil
+	}
+
 	// Post-process the incoming message
-	go uc.postProcessIncomingMessage(ctx, message, roomMember, partnerType)
+	go uc.postProcessIncomingMessage(ctx, message, roomMember, partnerType, roomMembers)
 
 	// Update room last message time synchronously
 	uc.updateLastMessageForRoomMembers(ctx, roomMember.RoomID, kafkaMessage.Message)
@@ -269,7 +314,7 @@ func (uc *ChatUseCase) ProcessIncomingMessage(ctx context.Context, kafkaMessage 
 }
 
 // postProcessIncomingMessage handles all post-processing after an incoming message is received
-func (uc *ChatUseCase) postProcessIncomingMessage(ctx context.Context, message *models.ChatMessage, roomMember *models.RoomMember, partnerType partners.PartnerType) {
+func (uc *ChatUseCase) postProcessIncomingMessage(ctx context.Context, message *models.ChatMessage, roomMember *models.RoomMember, partnerType partners.PartnerType, roomMembers []*models.RoomMember) {
 	ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
 	defer cancel()
 	// Increment unread count for all members except sender
@@ -279,9 +324,11 @@ func (uc *ChatUseCase) postProcessIncomingMessage(ctx context.Context, message *
 	uc.createMessageReceivedEvent(ctx, message, roomMember)
 
 	// Broadcast to socket connections
-	uc.broadcastIncomingMessage(ctx, message, roomMember.RoomID)
+	uc.broadcastIncomingMessage(ctx, message, roomMembers)
 
-	uc.llmUsecaseV2.TriggerLLM(ctx, message, roomMember)
+	if err := uc.llmUsecaseV2.TriggerLLM(ctx, message, roomMembers); err != nil {
+		log.Errorw(ctx, "Failed to process LLM for incoming message", "error", err, "message_id", message.ID.Hex())
+	}
 }
 
 // createMessageReceivedEvent creates a real-time event for the received message
@@ -303,19 +350,13 @@ func (uc *ChatUseCase) createMessageReceivedEvent(ctx context.Context, message *
 }
 
 // broadcastIncomingMessage broadcasts the incoming message to all room members via socket
-func (uc *ChatUseCase) broadcastIncomingMessage(ctx context.Context, message *models.ChatMessage, roomID primitive.ObjectID) {
-	if uc.socketHandler == nil {
+func (uc *ChatUseCase) broadcastIncomingMessage(ctx context.Context, message *models.ChatMessage, roomMembers []*models.RoomMember) {
+	if uc.socketHandler == nil || roomMembers == nil {
 		return
 	}
 
-	members, err := uc.roomMemberRepo.GetRoomMembersByRoomID(ctx, roomID)
-	if err != nil {
-		log.Errorw(ctx, "Failed to get room members for socket broadcast", "error", err)
-		return
-	}
-
-	userIDs := make([]string, 0, len(members))
-	for _, member := range members {
+	userIDs := make([]string, 0, len(roomMembers))
+	for _, member := range roomMembers {
 		userIDs = append(userIDs, member.UserID.Hex())
 	}
 
@@ -391,6 +432,13 @@ func (uc *ChatUseCase) findOrCreateRoom(ctx context.Context, roomID string, part
 func (uc *ChatUseCase) incrementUnreadCountForOthers(ctx context.Context, roomID primitive.ObjectID, senderID primitive.ObjectID) {
 	if err := uc.roomMemberRepo.IncrementUnreadCountByRoomID(ctx, roomID, senderID); err != nil {
 		fmt.Printf("Failed to increment unread count for room members: %v\n", err)
+	}
+}
+
+// incrementUnreadCountAndUpdateLastMessage efficiently handles both operations in a single MongoDB query
+func (uc *ChatUseCase) incrementUnreadCountAndUpdateLastMessage(ctx context.Context, roomID primitive.ObjectID, senderID primitive.ObjectID, content string) {
+	if err := uc.roomMemberRepo.IncrementUnreadCountAndUpdateLastMessage(ctx, roomID, senderID, content); err != nil {
+		fmt.Printf("Failed to increment unread count and update last message for room members: %v\n", err)
 	}
 }
 

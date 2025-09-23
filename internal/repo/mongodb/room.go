@@ -37,6 +37,7 @@ type RoomMemberRepository interface {
 	FindOrCreateRoom(ctx context.Context, source models.RoomPartner, roomInfo RoomInfo, participants []ParticipantInfo) error
 	IncrementUnreadCountByRoomID(ctx context.Context, roomID primitive.ObjectID, excludeUserID primitive.ObjectID) error
 	IncrementUnreadCount(ctx context.Context, source models.RoomPartner, excludeUserID primitive.ObjectID) error
+	IncrementUnreadCountAndUpdateLastMessage(ctx context.Context, roomID primitive.ObjectID, excludeUserID primitive.ObjectID, content string) error
 	MarkAsRead(ctx context.Context, userID primitive.ObjectID, source models.RoomPartner, lastReadMessageID primitive.ObjectID) error
 	MarkAsReadByRoomID(ctx context.Context, roomID primitive.ObjectID, userID primitive.ObjectID, lastReadMessageID primitive.ObjectID) error
 	UpdateLastMessageForRoom(ctx context.Context, roomID primitive.ObjectID, content string) error
@@ -258,6 +259,45 @@ func (r *roomMemberRepo) MarkAsReadByRoomID(ctx context.Context, roomID primitiv
 	}
 
 	_, err := r.collection.UpdateOne(ctx, filter, update)
+	return err
+}
+
+func (r *roomMemberRepo) IncrementUnreadCountAndUpdateLastMessage(ctx context.Context, roomID primitive.ObjectID, excludeUserID primitive.ObjectID, content string) error {
+	now := time.Now()
+
+	// Single query to increment unread count for others and update last message for all room members
+	// Use MongoDB's bulkWrite for atomic operations on different filter conditions
+	models := []mongo.WriteModel{
+		// Increment unread count for others (exclude sender)
+		mongo.NewUpdateManyModel().
+			SetFilter(bson.M{
+				"room_id": roomID,
+				"user_id": bson.M{"$ne": excludeUserID},
+			}).
+			SetUpdate(bson.M{
+				"$inc": bson.M{"unread_count": 1},
+				"$set": bson.M{
+					"last_message_at":      now,
+					"last_message_content": content,
+					"updated_at":           now,
+				},
+			}),
+		// Update last message for sender (without incrementing unread count)
+		mongo.NewUpdateOneModel().
+			SetFilter(bson.M{
+				"room_id": roomID,
+				"user_id": excludeUserID,
+			}).
+			SetUpdate(bson.M{
+				"$set": bson.M{
+					"last_message_at":      now,
+					"last_message_content": content,
+					"updated_at":           now,
+				},
+			}),
+	}
+
+	_, err := r.collection.BulkWrite(ctx, models)
 	return err
 }
 

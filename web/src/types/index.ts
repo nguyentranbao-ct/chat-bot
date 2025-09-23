@@ -40,6 +40,7 @@ export interface Room {
   created_at: string;
   updated_at: string;
   last_message_at?: string;
+  last_message_content: string;
   is_archived: boolean;
   unread_count: number;
 }

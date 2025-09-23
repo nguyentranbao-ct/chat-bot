@@ -13,6 +13,7 @@ import {
 
 class ApiClient {
   private client: AxiosInstance;
+  private authErrorHandler: (() => void) | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -36,13 +37,23 @@ class ApiClient {
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
+          // Use the auth error handler if available, otherwise fallback to window.location
+          if (this.authErrorHandler) {
+            this.authErrorHandler();
+          } else {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(error);
       },
     );
+  }
+
+  // Set auth error handler (called from AuthProvider)
+  setAuthErrorHandler(handler: () => void) {
+    this.authErrorHandler = handler;
   }
 
   // Auth endpoints

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 import { setStoredToken, setStoredUser } from '../utils/auth';
 import { Layout } from '../components/Layout';
@@ -10,6 +10,7 @@ const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { connect } = useSocket();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,8 +40,10 @@ const LoginPage: React.FC = () => {
       // Trigger socket connection now that user is authenticated
       connect();
 
-      // Redirect to chat
-      navigate('/chat');
+      // Redirect to return URL or chat
+      const returnTo = searchParams.get('returnTo');
+      const redirectPath = returnTo ? decodeURIComponent(returnTo) : '/chat';
+      navigate(redirectPath, { replace: true });
     } catch (err: any) {
       console.error('Login error:', err);
       setError(

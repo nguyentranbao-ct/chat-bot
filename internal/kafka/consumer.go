@@ -62,7 +62,8 @@ func startKafkaConsumer(opts consumerOptions) error {
 		OnStop: func(_ context.Context) error {
 			log.Warnf(ctx, "shutting down...")
 			cancel()
-			return <-done
+			// <-done
+			return nil
 		},
 	})
 

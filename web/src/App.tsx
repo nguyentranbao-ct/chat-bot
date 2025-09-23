@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage';
 import ChatPage from './pages/ChatPage';
 import { isAuthenticated } from './utils/auth';
 import { SocketProvider } from './contexts/SocketContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 // Protected route component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -19,8 +20,9 @@ const App: React.FC = () => {
   return (
     <SocketProvider>
       <Router>
-        <div className="App h-full">
-          <Routes>
+        <AuthProvider>
+          <div className="App h-full">
+            <Routes>
             <Route
               path="/login"
               element={
@@ -55,7 +57,8 @@ const App: React.FC = () => {
               element={<Navigate to={isAuthenticated() ? "/chat" : "/login"} replace />}
             />
           </Routes>
-        </div>
+          </div>
+        </AuthProvider>
       </Router>
     </SocketProvider>
   );

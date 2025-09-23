@@ -15,8 +15,7 @@ import (
 
 const (
 	ToolName        = "ListProducts"
-	ToolDescription = `Retrieve and display the seller's product listings when buyers ask about more available items, inventory, what's for sale, or want to browse products. Use this when customers inquire about merchandise, catalog, or what the seller has in stock. Fetches products from linked external service accounts like Chotot with details including name, price, category, and images.
-Be aware that the seller may not have any products listed. In that case, respond with a message indicating no products are available.`
+	ToolDescription = `Retrieve and display the seller's other product listings when buyers ask about more available items, inventory, what's for sale, or want to browse products. Use this when customers inquire about merchandise, catalog, or what the seller has in stock.`
 )
 
 // ListProductsInput defines the input arguments for the ListProducts tool
@@ -137,21 +136,28 @@ func (t *tool) Execute(ctx context.Context, args interface{}, session toolsmanag
 // GetGenkitTool returns the Firebase Genkit tool definition for AI integration
 func (t *tool) GetGenkitTool(session toolsmanager.SessionContext, g *genkit.Genkit) ai.Tool {
 	return genkit.DefineTool(g, ToolName, ToolDescription,
-		func(toolCtx *ai.ToolContext, input ListProductsInput) (*ListProductsOutput, error) {
+		func(toolCtx *ai.ToolContext, input ListProductsInput) (string, error) {
 			result, err := t.Execute(session.Context(), input, session)
 			if err != nil {
-				return nil, err
+				return "", err
 			}
-			if len(result.Products) == 0 {
-				// Return a message indicating no products found
-				return &ListProductsOutput{
-					Products: []Product{},
-					Total:    0,
-				}, nil
-			}
-
-			return nil, fmt.Errorf("unexpected result type: %T", result)
+			return buildProductContent(result.Products), nil
 		})
+}
+
+func buildProductContent(products []Product) string {
+	if len(products) == 0 {
+		return "No products available."
+	}
+
+	content := "Here are some of the products I have listed:\n"
+	for _, p := range products {
+		content += fmt.Sprintf("- %s (%s)\n", p.Name, p.PriceString)
+		if len(p.Images) > 0 {
+			content += fmt.Sprintf("  Image URL: %s\n", p.Images[0])
+		}
+	}
+	return content
 }
 
 // parseArgs converts interface{} arguments to the expected type

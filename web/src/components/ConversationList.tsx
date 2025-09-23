@@ -99,13 +99,13 @@ const ConversationList: React.FC<ConversationListProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between mt-1">
+                  <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-500 truncate flex-1 mr-2">
-                      <span>{room.context}</span>
+                      <span>{room.last_message_content}</span>
                       {/* Show item info if available */}
                       {room.item_name && (
                         <span className="text-xs text-gray-400 block">
-                          📦 {room.item_name}
+                          {room.item_name}
                           {room.item_price && ` - ${room.item_price}`}
                         </span>
                       )}

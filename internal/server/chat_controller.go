@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/internal_api"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
-	"github.com/nguyentranbao-ct/chat-bot/pkg/util"
 )
 
 type ChatController interface {
@@ -26,14 +24,12 @@ type ChatController interface {
 }
 
 type chatController struct {
-	chatUsecase       *usecase.ChatUseCase
-	socketBroadcaster usecase.SocketBroadcaster
+	chatUsecase *usecase.ChatUseCase
 }
 
-func NewChatController(chatUsecase *usecase.ChatUseCase, socketBroadcaster usecase.SocketBroadcaster) ChatController {
+func NewChatController(chatUsecase *usecase.ChatUseCase) ChatController {
 	return &chatController{
-		chatUsecase:       chatUsecase,
-		socketBroadcaster: socketBroadcaster,
+		chatUsecase: chatUsecase,
 	}
 }
 
@@ -113,25 +109,6 @@ func (cc *chatController) SendMessage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	// Broadcast message to all room members via socket
-	go func() {
-		ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
-		defer cancel()
-
-		members, err := cc.chatUsecase.GetRoomMembersByRoomID(ctx, roomID)
-		if err != nil {
-			fmt.Printf("Failed to get room members for socket broadcast: %v\n", err)
-			return
-		}
-
-		userIDs := make([]string, 0, len(members))
-		for _, member := range members {
-			userIDs = append(userIDs, member.UserID.Hex())
-		}
-
-		cc.socketBroadcaster.BroadcastMessageToUsers(userIDs, message)
-	}()
-
 	return c.JSON(http.StatusCreated, message)
 }
 
@@ -164,25 +141,6 @@ func (cc *chatController) SendInternalMessage(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-
-	// Broadcast message to all room members via socket
-	go func() {
-		ctx, cancel := util.NewTimeoutContext(ctx, 10*time.Second)
-		defer cancel()
-
-		members, err := cc.chatUsecase.GetRoomMembersByRoomID(ctx, roomID)
-		if err != nil {
-			fmt.Printf("Failed to get room members for internal message broadcast: %v\n", err)
-			return
-		}
-
-		userIDs := make([]string, 0, len(members))
-		for _, member := range members {
-			userIDs = append(userIDs, member.UserID.Hex())
-		}
-
-		cc.socketBroadcaster.BroadcastMessageToUsers(userIDs, message)
-	}()
 
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"message": "Message sent successfully",

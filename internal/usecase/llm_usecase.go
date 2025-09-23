@@ -1,11 +1,9 @@
 package usecase
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"strings"
-	"text/template"
 
 	log "github.com/carousell/ct-go/pkg/logger/log_context"
 	"github.com/firebase/genkit/go/ai"
@@ -15,6 +13,7 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/toolsmanager"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/tmplx"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -61,14 +60,17 @@ type PromptData struct {
 
 // ProcessMessage processes a message with early validation and deferred expensive operations
 func (l *llmUsecase) ProcessMessage(ctx context.Context, chatMode *models.ChatMode, data *PromptContext) error {
-	// PHASE 1: Early validation - validate all inputs before any expensive operations
+	log.Debugf(ctx, "Starting message processing")
 	if err := l.validateInputs(ctx, chatMode, data); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	// PHASE 2: Evaluate conditions - check if processing should proceed
+	promptData := &PromptData{
+		RoomMember: data.RoomMember,
+		Message:    data.Message,
+	}
 	if chatMode.Condition != "" {
-		shouldProcess, err := l.evaluateCondition(chatMode.Condition, data)
+		shouldProcess, err := l.evaluateCondition(chatMode.Condition, promptData)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate when condition: %w", err)
 		}
@@ -79,18 +81,11 @@ func (l *llmUsecase) ProcessMessage(ctx context.Context, chatMode *models.ChatMo
 		l.logConditionResult(ctx, chatMode, data, true)
 	}
 
-	// PHASE 3: Build prompt - only after validation passes
-	prompt, err := l.buildPrompt(chatMode.PromptTemplate, &PromptData{
-		RoomMember: data.RoomMember,
-		Message:    data.Message,
-	})
+	prompt, err := l.buildPrompt(chatMode.PromptTemplate, promptData)
 	if err != nil {
 		return fmt.Errorf("failed to build prompt: %w", err)
 	}
 
-	log.Infow(ctx, "Processing message", "chat_mode", chatMode.Name, "session_id", data.SessionID)
-
-	// PHASE 4: Create session context - deferred until after validation
 	session, err := l.createSessionContext(ctx, data)
 	if err != nil {
 		return fmt.Errorf("failed to create session context: %w", err)
@@ -101,13 +96,14 @@ func (l *llmUsecase) ProcessMessage(ctx context.Context, chatMode *models.ChatMo
 	if err != nil {
 		return fmt.Errorf("failed to get tools: %w", err)
 	}
+	log.Debugw(ctx, "Available tools for this session", "count", len(availableTools), "tools", chatMode.Tools)
 
 	// PHASE 6: Build initial messages
 	messages := l.buildInitialMessages(prompt, data, session)
 
 	// PHASE 7: Run AI agent loop
 	if err := l.runAgentLoop(ctx, chatMode, messages, availableTools, session); err != nil {
-		return err
+		return fmt.Errorf("failed during agent iterations: %w", err)
 	}
 
 	log.Infow(ctx, "Agent processing complete", "session_id", data.SessionID)
@@ -173,37 +169,33 @@ func (l *llmUsecase) createSessionContext(ctx context.Context, data *PromptConte
 
 // buildPrompt generates the prompt from template and data
 func (l *llmUsecase) buildPrompt(templateStr string, data *PromptData) (string, error) {
-	tmpl, err := template.New("prompt").Parse(templateStr)
+	tmpl, err := tmplx.Parse("prompt", templateStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
+	buf, err := tmpl.Render(data)
+	if err != nil {
 		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
-
 	return buf.String(), nil
 }
 
 // evaluateCondition evaluates the when condition template
-func (l *llmUsecase) evaluateCondition(whenTemplate string, data *PromptContext) (bool, error) {
+func (l *llmUsecase) evaluateCondition(whenTemplate string, data *PromptData) (bool, error) {
 	if whenTemplate == "" {
 		return true, nil // No condition means always process
 	}
-
-	tmpl, err := template.New("when").Parse(whenTemplate)
+	tmpl, err := tmplx.Parse("when", whenTemplate)
 	if err != nil {
 		return false, fmt.Errorf("failed to parse when template: %w", err)
 	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
+	buf, err := tmpl.Render(data)
+	if err != nil {
 		return false, fmt.Errorf("failed to execute when template: %w", err)
 	}
-
-	result := strings.TrimSpace(buf.String())
-	return result == "true", nil
+	result := strings.TrimSpace(buf.String()) == "true"
+	return result, nil
 }
 
 // buildInitialMessages creates the initial message array for the AI
@@ -238,43 +230,27 @@ func (l *llmUsecase) addRecentMessages(messages []*ai.Message, data *PromptConte
 	return messages
 }
 
-// runAgentLoop executes the AI agent conversation loop
+// executeAgentIterations runs the actual iteration loop and returns whether any tools were used
 func (l *llmUsecase) runAgentLoop(ctx context.Context, chatMode *models.ChatMode, messages []*ai.Message, availableTools []ai.Tool, session toolsmanager.SessionContext) error {
-	for i := 0; i < chatMode.MaxIterations; i++ {
-		log.Infow(ctx, "Agent iteration", "current", i+1, "max", chatMode.MaxIterations)
-
-		response, err := l.generateResponse(session, chatMode, messages, availableTools)
-		if err != nil {
-			return fmt.Errorf("failed to generate response: %w", err)
-		}
-
-		if response.Text() != "" {
-			messages = append(messages, ai.NewModelTextMessage(response.Text()))
-			log.Infow(ctx, "AI generated text response", "response", response.Text())
-		}
-
-		toolRequests := response.ToolRequests()
-		if len(toolRequests) == 0 {
-			log.Infow(ctx, "Ending conversation - AI did not use any tools", "ai_response", response.Text())
-			break
-		}
-
-		log.Infow(ctx, "Processing tool requests", "count", len(toolRequests))
-
-		toolResponseParts, err := l.executeToolRequests(ctx, toolRequests, availableTools, session)
-		if err != nil {
-			return err
-		}
-
-		if len(toolResponseParts) > 0 {
-			messages = append(messages, ai.NewMessage(ai.RoleTool, nil, toolResponseParts...))
-		}
-
-		if session.IsEnded() {
-			log.Info(ctx, "Session has been terminated by tool execution, ending conversation")
-			break
-		}
+	response, err := l.generateResponse(session, chatMode, messages, availableTools)
+	if err != nil {
+		return fmt.Errorf("failed to generate response: %w", err)
 	}
+
+	if response.Text() != "" {
+		messages = append(messages, ai.NewModelTextMessage(response.Text()))
+		log.Debugw(ctx, "AI generated text response", "response", response.Text())
+	}
+
+	toolRequests := response.ToolRequests()
+	if len(toolRequests) == 0 {
+		log.Debugw(ctx, "AI did not use any tools in this iteration")
+	}
+	log.Debugw(ctx, "Processing tool requests", "count", len(toolRequests))
+
+	// if session.IsEnded() {
+	// 	log.Debugw(ctx, "Session has been terminated by tool execution, ending conversation")
+	// }
 	return nil
 }
 
@@ -289,51 +265,17 @@ func (l *llmUsecase) generateResponse(session toolsmanager.SessionContext, chatM
 		ai.WithMessages(messages...),
 		ai.WithModelName(chatMode.Model),
 		ai.WithTools(toolRefs...),
+		ai.WithMaxTurns(chatMode.MaxIterations),
 	)
-}
-
-// executeToolRequests executes the requested tools
-func (l *llmUsecase) executeToolRequests(ctx context.Context, toolRequests []*ai.ToolRequest, availableTools []ai.Tool, session toolsmanager.SessionContext) ([]*ai.Part, error) {
-	var toolResponseParts []*ai.Part
-	for _, req := range toolRequests {
-		tool := l.findToolByName(req.Name, availableTools)
-		if tool == nil {
-			log.Errorw(ctx, "Tool not found", "tool_name", req.Name)
-			continue
-		}
-
-		output, err := tool.RunRaw(ctx, req.Input)
-		if err != nil {
-			log.Errorw(ctx, "Tool execution failed", "tool_name", req.Name, "error", err)
-			continue
-		}
-		toolResponseParts = append(toolResponseParts,
-			ai.NewToolResponsePart(&ai.ToolResponse{
-				Name:   req.Name,
-				Ref:    req.Ref,
-				Output: output,
-			}))
-	}
-	return toolResponseParts, nil
-}
-
-// findToolByName finds a tool by name in the available tools
-func (l *llmUsecase) findToolByName(name string, availableTools []ai.Tool) ai.Tool {
-	for _, tool := range availableTools {
-		if tool.Name() == name {
-			return tool
-		}
-	}
-	return nil
 }
 
 // logConditionResult logs the result of condition evaluation
 func (l *llmUsecase) logConditionResult(ctx context.Context, chatMode *models.ChatMode, data *PromptContext, shouldProcess bool) {
 	if shouldProcess {
-		log.Infow(ctx, "When condition evaluated to true, proceeding with processing",
+		log.Debugw(ctx, "When condition evaluated to true, proceeding with processing",
 			"chat_mode", chatMode.Name)
 	} else {
-		log.Infow(ctx, "When condition evaluated to false, stopping processing",
+		log.Debugw(ctx, "When condition evaluated to false, stopping processing",
 			"chat_mode", chatMode)
 	}
 }

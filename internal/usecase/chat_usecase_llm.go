@@ -13,7 +13,7 @@ import (
 )
 
 type LLMUsecaseV2 interface {
-	TriggerLLM(ctx context.Context, message *models.ChatMessage, roomMember *models.RoomMember) error
+	TriggerLLM(ctx context.Context, message *models.ChatMessage, roomMembers []*models.RoomMember) error
 }
 
 type llmUsecaseV2 struct {
@@ -46,24 +46,26 @@ func NewLLMUsecaseV2(
 	}
 }
 
-func (uc *llmUsecaseV2) TriggerLLM(ctx context.Context, message *models.ChatMessage, roomMember *models.RoomMember) error {
+func (uc *llmUsecaseV2) TriggerLLM(ctx context.Context, message *models.ChatMessage, roomMembers []*models.RoomMember) error {
 	ctx, cancel := util.NewTimeoutContext(ctx, 180*time.Second)
 	defer cancel()
 
-	log.Infof(ctx, "Processing LLM trigger for message from user %s in room %s", message.SenderID.Hex(), roomMember.Source.RoomID)
-
-	user, err := uc.userRepo.GetByID(ctx, message.SenderID)
-	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
+	// Find the room member that contains the room info (first one should have the source info)
+	if len(roomMembers) == 0 {
+		return fmt.Errorf("no room members provided")
 	}
 
-	if user.IsInternal {
-		log.Infof(ctx, "Skipping LLM processing - user %s is internal", message.SenderID.Hex())
+	roomMember := roomMembers[0]
+
+	merchantID, buyerID, err := uc.findMerchantAndBuyer(ctx, roomMembers, message.SenderID)
+	if err != nil {
+		return fmt.Errorf("failed to find merchant and buyer: %w", err)
+	}
+	if merchantID == message.SenderID {
 		return nil
 	}
 
 	chatModeKey := fmt.Sprintf("%s_chat_mode", roomMember.Source.Name)
-
 	chatMode, err := uc.getChatModeForUser(ctx, message.SenderID, chatModeKey)
 	if err != nil {
 		return fmt.Errorf("failed to get chat mode for user %s: %w", message.SenderID.Hex(), err)
@@ -74,12 +76,7 @@ func (uc *llmUsecaseV2) TriggerLLM(ctx context.Context, message *models.ChatMess
 		return fmt.Errorf("failed to create session: %w", err)
 	}
 
-	merchantID, buyerID, err := uc.findMerchantAndBuyer(ctx, roomMember.RoomID, message.SenderID)
-	if err != nil {
-		return fmt.Errorf("failed to find merchant and buyer: %w", err)
-	}
-
-	recentMessages, err := uc.fetchRecentMessages(ctx, roomMember.RoomID, 5)
+	recentMessages, err := uc.fetchRecentMessages(ctx, roomMember.RoomID, 3)
 	if err != nil {
 		log.Warnf(ctx, "Failed to fetch recent messages: %v", err)
 		recentMessages = &models.MessageHistory{Messages: []models.HistoryMessage{}}
@@ -120,32 +117,22 @@ func (uc *llmUsecaseV2) getChatModeForUser(ctx context.Context, userID primitive
 	return chatMode, nil
 }
 
-func (uc *llmUsecaseV2) findMerchantAndBuyer(ctx context.Context, roomID primitive.ObjectID, messageSenderID primitive.ObjectID) (merchantID, buyerID primitive.ObjectID, err error) {
-	members, err := uc.roomMemberRepo.GetRoomMembersByRoomID(ctx, roomID)
-	if err != nil {
-		return primitive.NilObjectID, primitive.NilObjectID, fmt.Errorf("failed to get room members: %w", err)
+func (uc *llmUsecaseV2) findMerchantAndBuyer(ctx context.Context, roomMembers []*models.RoomMember, messageSenderID primitive.ObjectID) (merchantID, buyerID primitive.ObjectID, err error) {
+	if len(roomMembers) == 0 {
+		return primitive.NilObjectID, primitive.NilObjectID, fmt.Errorf("no room members provided")
 	}
-
-	var internalUserID, externalUserID primitive.ObjectID
-	for _, member := range members {
-		user, err := uc.userRepo.GetByID(ctx, member.UserID)
-		if err != nil {
-			log.Warnf(ctx, "Failed to get user %s: %v", member.UserID.Hex(), err)
-			continue
-		}
-
-		if user.IsInternal {
-			internalUserID = member.UserID
+	log.Infow(ctx, "room members", "count", len(roomMembers), "members", roomMembers)
+	for _, member := range roomMembers {
+		if member.Role == "merchant" || member.Role == "seller" {
+			merchantID = member.UserID
 		} else {
-			externalUserID = member.UserID
+			buyerID = member.UserID
 		}
 	}
-
-	if internalUserID == primitive.NilObjectID || externalUserID == primitive.NilObjectID {
-		return primitive.NilObjectID, primitive.NilObjectID, fmt.Errorf("could not find both internal and external users in room")
+	if merchantID == primitive.NilObjectID || buyerID == primitive.NilObjectID {
+		return primitive.NilObjectID, primitive.NilObjectID, fmt.Errorf("could not find both merchant and buyer users in room")
 	}
-
-	return internalUserID, externalUserID, nil
+	return merchantID, buyerID, nil
 }
 
 func (uc *llmUsecaseV2) fetchRecentMessages(ctx context.Context, roomID primitive.ObjectID, limit int) (*models.MessageHistory, error) {
