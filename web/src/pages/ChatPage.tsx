@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
+import { Header } from '../components/Header';
+import { PartnerAttributesModal } from '../components/PartnerAttributesModal';
 import ConversationList from '../components/ConversationList';
 import ChatWindow from '../components/ChatWindow';
 import { useSocket } from '../contexts/SocketContext';
@@ -26,6 +28,8 @@ const ChatPage: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showPartnerModal, setShowPartnerModal] = useState(false);
+  const [isInitialSetup, setIsInitialSetup] = useState(false);
 
   // Define callback functions first
   // Prevent redundant reloads when navigating between room routes that remount the component
@@ -101,7 +105,27 @@ const ChatPage: React.FC = () => {
 
     setUser(storedUser);
     loadRooms();
-  }, [navigate]);
+
+    // Check if we should show partner attributes popup for new users
+    checkPartnerAttributes();
+  }, [navigate, loadRooms]);
+
+  const checkPartnerAttributes = async () => {
+    try {
+      const attributes = await api.getPartnerAttributes();
+      const hasAnyAttribute = Object.values(attributes).some(value => value && value.trim() !== '');
+
+      if (!hasAnyAttribute) {
+        setIsInitialSetup(true);
+        setShowPartnerModal(true);
+      }
+    } catch (err) {
+      // If we can't fetch attributes or they don't exist, show the modal
+      console.log('No partner attributes found, showing setup modal');
+      setIsInitialSetup(true);
+      setShowPartnerModal(true);
+    }
+  };
 
   // Handle URL room parameter
   useEffect(() => {
@@ -199,7 +223,7 @@ const ChatPage: React.FC = () => {
         socket.offTypingStop(handleTypingStop);
       };
     }
-  }, [selectedRoom?.id, user?.id, socket.isConnected]);
+  }, [selectedRoom?.id, user?.id, socket]);
 
   // Join/leave rooms when selection changes
   useEffect(() => {
@@ -218,7 +242,7 @@ const ChatPage: React.FC = () => {
         }
       };
     }
-  }, [selectedRoom]);
+  }, [selectedRoom, socket, loadMessages]);
 
   const handleRoomSelect = useCallback((room: Room) => {
     setSelectedRoom(room);
@@ -247,9 +271,26 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  const handlePartnerSettings = () => {
+    setIsInitialSetup(false);
+    setShowPartnerModal(true);
+  };
+
+  const handlePartnerModalClose = () => {
+    setShowPartnerModal(false);
+  };
+
   if (isLoading) {
     return (
-      <Layout>
+      <Layout
+        header={user && (
+          <Header
+            user={user}
+            onPartnerSettings={handlePartnerSettings}
+            onLogout={handleLogout}
+          />
+        )}
+      >
         <div className="h-full flex items-center justify-center">
           <div className="flex items-center space-x-2">
             <svg className="animate-spin h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24">
@@ -264,8 +305,16 @@ const ChatPage: React.FC = () => {
   }
 
   return (
-    <Layout>
-      <div className="h-full flex">
+    <Layout
+      header={user && (
+        <Header
+          user={user}
+          onPartnerSettings={handlePartnerSettings}
+          onLogout={handleLogout}
+        />
+      )}
+    >
+      <div className="h-full flex relative">
         <ConversationList
           rooms={rooms}
           selectedRoomId={selectedRoom?.id}
@@ -299,21 +348,6 @@ const ChatPage: React.FC = () => {
           </div>
         )}
 
-        {/* User Menu (floating) */}
-        <div className="absolute top-4 right-4">
-          <div className="relative">
-            <button
-              onClick={handleLogout}
-              className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              title="Logout"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
         {/* Error toast */}
         {error && (
           <div className="absolute bottom-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg">
@@ -334,6 +368,14 @@ const ChatPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Partner Attributes Modal */}
+      <PartnerAttributesModal
+        isOpen={showPartnerModal}
+        onClose={handlePartnerModalClose}
+        showSkipOption={isInitialSetup}
+        title={isInitialSetup ? "Welcome! Set up your partner integrations" : "Partner Integration Settings"}
+      />
     </Layout>
   );
 };

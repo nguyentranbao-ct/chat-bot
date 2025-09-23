@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Room, ChatMessage, SendMessageRequest } from '../types';
 import MessageInput from './MessageInput';
 import AIAssistant from './AIAssistant';

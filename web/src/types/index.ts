@@ -20,6 +20,7 @@ export interface LoginResponse {
   token: string;
   user: User;
   expires_at: string;
+  has_partner_attributes: boolean;
 }
 
 export interface ProfileUpdateRequest {
@@ -111,4 +112,19 @@ export interface SocketEvents {
   user_typing_start: TypingIndicator;
   user_typing_stop: TypingIndicator;
   room_updated: Room;
+}
+
+// Partner Attributes Types
+export interface PartnerAttributesResponse {
+  chotot_id?: string;
+  chotot_oid?: string;
+  whatsapp_phone_number_id?: string;
+  // Note: whatsapp_system_token is intentionally excluded from response
+}
+
+export interface PartnerAttributesRequest {
+  chotot_id?: string;
+  chotot_oid?: string;
+  whatsapp_phone_number_id?: string;
+  whatsapp_system_token?: string;
 }

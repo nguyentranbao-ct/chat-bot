@@ -79,6 +79,11 @@ func StartServer(
 	api.PUT("/auth/profile", authController.UpdateProfile, authMiddleware)
 	api.POST("/auth/logout", authController.Logout, authMiddleware)
 
+	// Profile routes for partner attributes
+	profileGroup := api.Group("/profile", authMiddleware)
+	profileGroup.GET("/attributes", handler.GetPartnerAttributes)
+	profileGroup.PUT("/attributes", handler.UpdatePartnerAttributes)
+
 	// Chat routes
 	chatGroup := api.Group("/chat", authMiddleware)
 	chatGroup.GET("/rooms", chatController.GetRooms)

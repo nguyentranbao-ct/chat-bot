@@ -25,9 +25,10 @@ type LoginRequest struct {
 
 // LoginResponse represents the login response with JWT token
 type LoginResponse struct {
-	Token     string    `json:"token"`
-	User      User      `json:"user"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Token                string    `json:"token"`
+	User                 User      `json:"user"`
+	ExpiresAt            time.Time `json:"expires_at"`
+	HasPartnerAttributes bool      `json:"has_partner_attributes"`
 }
 
 // ProfileUpdateRequest represents user profile update request

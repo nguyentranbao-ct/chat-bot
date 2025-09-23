@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/crypto"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -23,20 +25,27 @@ type UserUsecase interface {
 	GetUsersByTag(ctx context.Context, tags []string) ([]*models.User, error)
 	GetUserByChototID(ctx context.Context, chototID string) (*models.User, error)
 	RemoveUserAttribute(ctx context.Context, userID primitive.ObjectID, key string) error
+
+	GetPartnerAttributes(ctx context.Context, userID primitive.ObjectID) (*models.PartnerAttributesResponse, error)
+	UpdatePartnerAttributes(ctx context.Context, userID primitive.ObjectID, req *models.PartnerAttributesRequest) error
+	HasPartnerAttributes(ctx context.Context, userID primitive.ObjectID) (bool, error)
 }
 
 type userUsecase struct {
 	userRepo          mongodb.UserRepository
 	userAttributeRepo mongodb.UserAttributeRepository
+	cryptoClient      crypto.Client
 }
 
 func NewUserUsecase(
 	userRepo mongodb.UserRepository,
 	userAttributeRepo mongodb.UserAttributeRepository,
+	cryptoClient crypto.Client,
 ) UserUsecase {
 	return &userUsecase{
 		userRepo:          userRepo,
 		userAttributeRepo: userAttributeRepo,
+		cryptoClient:      cryptoClient,
 	}
 }
 
@@ -179,6 +188,78 @@ func (uc *userUsecase) RemoveUserAttribute(ctx context.Context, userID primitive
 		return fmt.Errorf("failed to remove user attribute: %w", err)
 	}
 	return nil
+}
+
+func (uc *userUsecase) GetPartnerAttributes(ctx context.Context, userID primitive.ObjectID) (*models.PartnerAttributesResponse, error) {
+	attrs, err := uc.userAttributeRepo.GetByUserIDAndTags(ctx, userID, []string{models.TagChotot, models.TagWhatsApp})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get partner attributes: %w", err)
+	}
+
+	response := &models.PartnerAttributesResponse{}
+
+	for _, attr := range attrs {
+		// Skip sensitive attributes in response
+		if slices.Contains(attr.Tags, models.TagSensitive) {
+			continue
+		}
+
+		switch attr.Key {
+		case models.PartnerAttrChototID:
+			response.ChototID = attr.Value
+		case models.PartnerAttrChototOID:
+			response.ChototOID = attr.Value
+		case models.PartnerAttrWhatsAppPhoneNumberID:
+			response.WhatsAppPhoneNumberID = attr.Value
+		}
+	}
+
+	return response, nil
+}
+
+func (uc *userUsecase) UpdatePartnerAttributes(ctx context.Context, userID primitive.ObjectID, req *models.PartnerAttributesRequest) error {
+	// Update Chotot attributes
+	if req.ChototID != "" {
+		if err := uc.SetUserAttribute(ctx, userID, models.PartnerAttrChototID, req.ChototID, []string{models.TagChotot}); err != nil {
+			return fmt.Errorf("failed to set chotot_id: %w", err)
+		}
+	}
+
+	if req.ChototOID != "" {
+		if err := uc.SetUserAttribute(ctx, userID, models.PartnerAttrChototOID, req.ChototOID, []string{models.TagChotot}); err != nil {
+			return fmt.Errorf("failed to set chotot_oid: %w", err)
+		}
+	}
+
+	// Update WhatsApp attributes
+	if req.WhatsAppPhoneNumberID != "" {
+		if err := uc.SetUserAttribute(ctx, userID, models.PartnerAttrWhatsAppPhoneNumberID, req.WhatsAppPhoneNumberID, []string{models.TagWhatsApp}); err != nil {
+			return fmt.Errorf("failed to set whatsapp_phone_number_id: %w", err)
+		}
+	}
+
+	if req.WhatsAppSystemToken != "" {
+		// Encrypt sensitive token before storing
+		encryptedToken, err := uc.cryptoClient.Encrypt(req.WhatsAppSystemToken)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt whatsapp_system_token: %w", err)
+		}
+
+		if err := uc.SetUserAttribute(ctx, userID, models.PartnerAttrWhatsAppSystemToken, encryptedToken, []string{models.TagWhatsApp, models.TagSensitive}); err != nil {
+			return fmt.Errorf("failed to set whatsapp_system_token: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (uc *userUsecase) HasPartnerAttributes(ctx context.Context, userID primitive.ObjectID) (bool, error) {
+	attrs, err := uc.userAttributeRepo.GetByUserIDAndTags(ctx, userID, []string{models.TagChotot, models.TagWhatsApp})
+	if err != nil {
+		return false, fmt.Errorf("failed to check partner attributes: %w", err)
+	}
+
+	return len(attrs) > 0, nil
 }
 
 // isValidAttributeKey validates that the key contains only alpha-numeric characters and underscores

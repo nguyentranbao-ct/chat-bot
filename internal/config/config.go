@@ -5,13 +5,14 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `envPrefix:"SERVER_"`
-	Database DatabaseConfig `envPrefix:"DATABASE_"`
-	ChatAPI  ChatAPIConfig  `envPrefix:"CHAT_API_"`
-	LLM      LLMConfig      `envPrefix:"LLM_"`
-	Kafka    KafkaConfig    `envPrefix:"KAFKA_"`
-	JWT      JWTConfig      `envPrefix:"JWT_"`
-	Socket   SocketConfig   `envPrefix:"SOCKET_"`
+	Server     ServerConfig     `envPrefix:"SERVER_"`
+	Database   DatabaseConfig   `envPrefix:"DATABASE_"`
+	ChatAPI    ChatAPIConfig    `envPrefix:"CHAT_API_"`
+	LLM        LLMConfig        `envPrefix:"LLM_"`
+	Kafka      KafkaConfig      `envPrefix:"KAFKA_"`
+	JWT        JWTConfig        `envPrefix:"JWT_"`
+	Socket     SocketConfig     `envPrefix:"SOCKET_"`
+	Encryption EncryptionConfig `envPrefix:"ENCRYPTION_"`
 }
 
 type ServerConfig struct {
@@ -54,6 +55,10 @@ type JWTConfig struct {
 
 type SocketConfig struct {
 	BaseURL string `env:"BASE_URL" envDefault:"http://localhost:7070"`
+}
+
+type EncryptionConfig struct {
+	Key string `env:"KEY,required"`
 }
 
 func Load() (*Config, error) {

@@ -25,3 +25,32 @@ type UserAttribute struct {
 	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt time.Time          `bson:"updated_at" json:"updated_at"`
 }
+
+// Partner attribute constants
+const (
+	PartnerAttrChototID                = "chotot_id"
+	PartnerAttrChototOID               = "chotot_oid"
+	PartnerAttrWhatsAppPhoneNumberID   = "whatsapp_phone_number_id"
+	PartnerAttrWhatsAppSystemToken     = "whatsapp_system_token"
+)
+
+// Partner attribute tags
+const (
+	TagChotot    = "chotot"
+	TagWhatsApp  = "whatsapp"
+	TagSensitive = "sensitive"
+)
+
+type PartnerAttributesRequest struct {
+	ChototID                string `json:"chotot_id,omitempty"`
+	ChototOID               string `json:"chotot_oid,omitempty"`
+	WhatsAppPhoneNumberID   string `json:"whatsapp_phone_number_id,omitempty"`
+	WhatsAppSystemToken     string `json:"whatsapp_system_token,omitempty"`
+}
+
+type PartnerAttributesResponse struct {
+	ChototID              string `json:"chotot_id,omitempty"`
+	ChototOID             string `json:"chotot_oid,omitempty"`
+	WhatsAppPhoneNumberID string `json:"whatsapp_phone_number_id,omitempty"`
+	// Note: whatsapp_system_token is intentionally excluded from response
+}

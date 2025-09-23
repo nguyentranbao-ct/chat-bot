@@ -40,7 +40,7 @@ const LoginPage: React.FC = () => {
       // Trigger socket connection now that user is authenticated
       connect();
 
-      // Redirect to return URL or chat
+      // Always redirect to return URL or chat after successful login
       const returnTo = searchParams.get('returnTo');
       const redirectPath = returnTo ? decodeURIComponent(returnTo) : '/chat';
       navigate(redirectPath, { replace: true });
@@ -136,6 +136,7 @@ const LoginPage: React.FC = () => {
           </form>
         </div>
       </div>
+
     </Layout>
   );
 };

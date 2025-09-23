@@ -8,6 +8,7 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/crypto"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chotot"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/internal_api"
@@ -46,6 +47,7 @@ func Invoke(funcs ...any) *fx.App {
 			newMongoDB,
 			newJWTSecret,
 			newSocketBroadcaster,
+			newCryptoClient,
 
 			// Controllers
 			server.NewHandler,
@@ -170,4 +172,8 @@ func initializePartners(
 			return nil
 		},
 	})
+}
+
+func newCryptoClient(cfg *config.Config) (crypto.Client, error) {
+	return crypto.NewClient(cfg.Encryption.Key)
 }

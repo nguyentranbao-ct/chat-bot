@@ -16,16 +16,18 @@ import (
 )
 
 type AuthUseCase struct {
-	userRepo  mongodb.UserRepository
-	tokenRepo mongodb.AuthTokenRepository
-	jwtSecret string
+	userRepo    mongodb.UserRepository
+	tokenRepo   mongodb.AuthTokenRepository
+	userUsecase UserUsecase
+	jwtSecret   string
 }
 
-func NewAuthUseCase(userRepo mongodb.UserRepository, tokenRepo mongodb.AuthTokenRepository, jwtSecret string) *AuthUseCase {
+func NewAuthUseCase(userRepo mongodb.UserRepository, tokenRepo mongodb.AuthTokenRepository, userUsecase UserUsecase, jwtSecret string) *AuthUseCase {
 	return &AuthUseCase{
-		userRepo:  userRepo,
-		tokenRepo: tokenRepo,
-		jwtSecret: jwtSecret,
+		userRepo:    userRepo,
+		tokenRepo:   tokenRepo,
+		userUsecase: userUsecase,
+		jwtSecret:   jwtSecret,
 	}
 }
 
@@ -44,8 +46,9 @@ func (uc *AuthUseCase) Login(ctx context.Context, req models.LoginRequest, userA
 			if err := uc.userRepo.Create(ctx, user); err != nil {
 				return nil, fmt.Errorf("failed to create user: %w", err)
 			}
+		} else {
+			return nil, fmt.Errorf("failed to get user by email: %w", err)
 		}
-		return nil, fmt.Errorf("failed to get user by email: %w", err)
 	}
 
 	// Update last login time and ensure user is active
@@ -77,10 +80,18 @@ func (uc *AuthUseCase) Login(ctx context.Context, req models.LoginRequest, userA
 		return nil, fmt.Errorf("failed to store auth token: %w", err)
 	}
 
+	// Check if user has partner attributes
+	hasPartnerAttributes, err := uc.userUsecase.HasPartnerAttributes(ctx, user.ID)
+	if err != nil {
+		// Log error but don't fail login
+		hasPartnerAttributes = false
+	}
+
 	return &models.LoginResponse{
-		Token:     token,
-		User:      *user,
-		ExpiresAt: expiresAt,
+		Token:                token,
+		User:                 *user,
+		ExpiresAt:            expiresAt,
+		HasPartnerAttributes: hasPartnerAttributes,
 	}, nil
 }
 

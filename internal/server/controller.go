@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/nguyentranbao-ct/chat-bot/internal/models"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -22,6 +23,10 @@ type Controller interface {
 	GetUserAttributes(c echo.Context) error
 	GetUserAttributeByKey(c echo.Context) error
 	RemoveUserAttribute(c echo.Context) error
+
+	// Profile endpoints
+	GetPartnerAttributes(c echo.Context) error
+	UpdatePartnerAttributes(c echo.Context) error
 }
 
 type controller struct {
@@ -230,5 +235,50 @@ func (h *controller) RemoveUserAttribute(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"status":  "success",
 		"message": "user attribute removed successfully",
+	})
+}
+
+// Profile endpoints
+
+func (h *controller) GetPartnerAttributes(c echo.Context) error {
+	// Get user from context (set by auth middleware)
+	user, ok := c.Get("user").(*models.User)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "user not found in context")
+	}
+
+	ctx := c.Request().Context()
+	attrs, err := h.userUsecase.GetPartnerAttributes(ctx, user.ID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, attrs)
+}
+
+func (h *controller) UpdatePartnerAttributes(c echo.Context) error {
+	// Get user from context (set by auth middleware)
+	user, ok := c.Get("user").(*models.User)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "user not found in context")
+	}
+
+	var req models.PartnerAttributesRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	if err := c.Validate(req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	ctx := c.Request().Context()
+	if err := h.userUsecase.UpdatePartnerAttributes(ctx, user.ID, &req); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"status":  "success",
+		"message": "partner attributes updated successfully",
 	})
 }

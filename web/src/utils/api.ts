@@ -9,6 +9,8 @@ import {
   ChatMessage,
   SendMessageRequest,
   MessageEvent,
+  PartnerAttributesResponse,
+  PartnerAttributesRequest,
 } from '../types';
 
 class ApiClient {
@@ -141,6 +143,18 @@ class ApiClient {
     await this.client.post(`/chat/rooms/${roomId}/typing`, {
       is_typing: isTyping,
     });
+  }
+
+  // Partner attributes endpoints
+  async getPartnerAttributes(): Promise<PartnerAttributesResponse> {
+    const response: AxiosResponse<PartnerAttributesResponse> = await this.client.get(
+      '/profile/attributes',
+    );
+    return response.data;
+  }
+
+  async updatePartnerAttributes(request: PartnerAttributesRequest): Promise<void> {
+    await this.client.put('/profile/attributes', request);
   }
 }
 
