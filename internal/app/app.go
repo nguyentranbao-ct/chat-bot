@@ -8,14 +8,12 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/nguyentranbao-ct/chat-bot/internal/config"
-	"github.com/nguyentranbao-ct/chat-bot/pkg/crypto"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chatapi"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/chotot"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/internal_api"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/mongodb"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/partners"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/socket"
-	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/end_session"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/fetch_messages"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/list_products"
 	"github.com/nguyentranbao-ct/chat-bot/internal/repo/tools/purchase_intent"
@@ -24,6 +22,7 @@ import (
 	"github.com/nguyentranbao-ct/chat-bot/internal/server"
 	"github.com/nguyentranbao-ct/chat-bot/internal/setup"
 	"github.com/nguyentranbao-ct/chat-bot/internal/usecase"
+	"github.com/nguyentranbao-ct/chat-bot/pkg/crypto"
 	"github.com/nguyentranbao-ct/chat-bot/pkg/util"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -90,7 +89,6 @@ func Invoke(funcs ...any) *fx.App {
 			toolsmanager.NewToolsManager,
 
 			// Tools
-			end_session.NewTool,
 			purchase_intent.NewTool,
 			fetch_messages.NewTool,
 			reply_message.NewTool,
@@ -141,7 +139,6 @@ func initializeProductServices(
 
 func initializeLLMTools(
 	toolsManager toolsmanager.ToolsManager,
-	endSessionTool end_session.Tool,
 	fetchMessagesTool fetch_messages.Tool,
 	replyMessageTool reply_message.Tool,
 	purchaseIntentTool purchase_intent.Tool,
@@ -149,7 +146,6 @@ func initializeLLMTools(
 ) {
 	util.PanicOnError(
 		"register tools",
-		toolsManager.AddTool(endSessionTool),
 		toolsManager.AddTool(fetchMessagesTool),
 		toolsManager.AddTool(replyMessageTool),
 		toolsManager.AddTool(purchaseIntentTool),

@@ -157,17 +157,17 @@ erDiagram
 
 ### Primary Collections
 
-| Collection | Purpose | Key Relationships |
-|-----------|---------|------------------|
-| `users` | User management and profiles | → `user_attributes`, `room_members` |
-| `user_attributes` | Partner-specific user data | ← `users` |
-| `room_members` | **Core denormalized collection** | ← `users`, → `chat_sessions`, `chat_messages` |
-| `chat_modes` | LLM configuration templates | ← `users`, → `chat_sessions` |
-| `chat_sessions` | Conversation lifecycle tracking | ← `room_members`, `chat_modes` → `chat_activities` |
-| `chat_activities` | Action and tool execution logs | ← `chat_sessions` |
-| `purchase_intents` | Buy signal analytics | ← `chat_sessions`, `users`, `room_members` |
-| `auth_tokens` | JWT token management | ← `users` |
-| `chat_messages` | Message storage | ← `room_members`, `users` |
+| Collection         | Purpose                          | Key Relationships                                  |
+| ------------------ | -------------------------------- | -------------------------------------------------- |
+| `users`            | User management and profiles     | → `user_attributes`, `room_members`                |
+| `user_attributes`  | Partner-specific user data       | ← `users`                                          |
+| `room_members`     | **Core denormalized collection** | ← `users`, → `chat_sessions`, `chat_messages`      |
+| `chat_modes`       | LLM configuration templates      | ← `users`, → `chat_sessions`                       |
+| `chat_sessions`    | Conversation lifecycle tracking  | ← `room_members`, `chat_modes` → `chat_activities` |
+| `chat_activities`  | Action and tool execution logs   | ← `chat_sessions`                                  |
+| `purchase_intents` | Buy signal analytics             | ← `chat_sessions`, `users`, `room_members`         |
+| `auth_tokens`      | JWT token management             | ← `users`                                          |
+| `chat_messages`    | Message storage                  | ← `room_members`, `users`                          |
 
 ## MongoDB Collections
 
@@ -186,6 +186,7 @@ erDiagram
 ```
 
 **Indexes:**
+
 - `{"email": 1}` (unique)
 - `{"is_active": 1, "created_at": -1}`
 
@@ -204,12 +205,14 @@ erDiagram
 ```
 
 **Partner Attribute Keys:**
+
 - `chotot_id`: Chotot user identifier
 - `chotot_oid`: Chotot organization ID
 - `whatsapp_phone_number_id`: WhatsApp Business phone number
 - `whatsapp_system_token`: WhatsApp API token (sensitive)
 
 **Indexes:**
+
 - `{"user_id": 1, "key": 1}` (unique compound)
 - `{"tags": 1}`
 
@@ -249,12 +252,14 @@ erDiagram
 ```
 
 **Key Benefits of Denormalization:**
+
 - **Single Query Performance**: Get complete room + member data in one query
 - **No Expensive Joins**: Eliminates need for aggregation pipelines
 - **Optimized for Reads**: Chat applications are read-heavy
 - **Unread Count Efficiency**: Direct field access vs. message counting
 
 **Indexes:**
+
 - `{"user_id": 1, "updated_at": -1}` (user's rooms by activity)
 - `{"room_id": 1, "user_id": 1}` (unique membership)
 - `{"source.name": 1, "source.room_id": 1}` (partner room lookup)
@@ -286,6 +291,7 @@ erDiagram
 ### Partner-Specific Schemas
 
 #### Chotot Integration
+
 ```javascript
 // RoomMember.source
 {
@@ -315,6 +321,7 @@ erDiagram
 ```
 
 #### WhatsApp Integration (Future)
+
 ```javascript
 // RoomMember.source
 {
@@ -350,6 +357,7 @@ erDiagram
 ```
 
 **Indexes:**
+
 - `{"token_hash": 1}` (unique)
 - `{"user_id": 1, "expires_at": -1}`
 - `{"expires_at": 1}` (TTL index for auto-cleanup)
@@ -374,6 +382,7 @@ erDiagram
 ```
 
 **Indexes:**
+
 - `{"name": 1}` (unique)
 - `{"user_id": 1}` (custom modes)
 - `{"condition": 1}` (mode matching)
@@ -396,6 +405,7 @@ erDiagram
 ```
 
 **Indexes:**
+
 - `{"room_id": 1, "status": 1, "started_at": -1}`
 - `{"status": 1, "updated_at": -1}`
 
@@ -419,13 +429,14 @@ erDiagram
 ```
 
 **Activity Action Types:**
+
 - `purchase_intent`: Buy signal detected
 - `reply_message`: Message sent to user
 - `fetch_messages`: History retrieved
-- `end_session`: Session terminated
 - `list_products`: Product search performed
 
 **Indexes:**
+
 - `{"session_id": 1, "executed_at": -1}`
 - `{"room_id": 1, "action": 1, "executed_at": -1}`
 
@@ -446,12 +457,14 @@ erDiagram
 ```
 
 **Intent Types:**
+
 - `interest`: Initial product inquiry
 - `price_negotiation`: Price discussion
 - `strong_buy_signal`: High purchase probability
 - `purchase_confirmed`: Explicit buy confirmation
 
 **Indexes:**
+
 - `{"session_id": 1, "created_at": -1}`
 - `{"user_id": 1, "intent": 1, "created_at": -1}`
 - `{"percentage": -1, "created_at": -1}` (high-intent analysis)
@@ -462,23 +475,22 @@ erDiagram
 
 ```javascript
 // Room member queries (most common)
-db.room_members.createIndex({"user_id": 1, "updated_at": -1})
-db.room_members.createIndex({"room_id": 1, "user_id": 1}, {unique: true})
+db.room_members.createIndex({ user_id: 1, updated_at: -1 });
+db.room_members.createIndex({ room_id: 1, user_id: 1 }, { unique: true });
 
 // Partner-specific lookups
-db.room_members.createIndex({"source.name": 1, "source.room_id": 1})
+db.room_members.createIndex({ 'source.name': 1, 'source.room_id': 1 });
 
 // Chat session tracking
-db.chat_sessions.createIndex({"room_id": 1, "status": 1, "started_at": -1})
+db.chat_sessions.createIndex({ room_id: 1, status: 1, started_at: -1 });
 
 // Activity analytics
-db.chat_activities.createIndex({"action": 1, "executed_at": -1})
-db.purchase_intents.createIndex({"percentage": -1, "created_at": -1})
+db.chat_activities.createIndex({ action: 1, executed_at: -1 });
+db.purchase_intents.createIndex({ percentage: -1, created_at: -1 });
 
 // Authentication
-db.auth_tokens.createIndex({"token_hash": 1}, {unique: true})
-db.auth_tokens.createIndex({"expires_at": 1}, {expireAfterSeconds: 0})
-
+db.auth_tokens.createIndex({ token_hash: 1 }, { unique: true });
+db.auth_tokens.createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 });
 ```
 
 ### Data Validation Rules

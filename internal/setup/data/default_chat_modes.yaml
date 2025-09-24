@@ -29,7 +29,6 @@
     - ReplyMessage
     - FetchMessages
     - ListProducts
-    # - EndSession
   max_iterations: 10
   max_prompt_tokens: 4000
   max_response_tokens: 1000
